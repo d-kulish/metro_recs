@@ -1,1 +1,9 @@
-pandas
+pandas==1.5.3
+pandas-gbq==0.19.2
+pyarrow==10.0.1
+tensorflow==2.15.1
+tensorflow-recommenders==0.7.3
+tensorflow-datasets
+tfx==1.15.0
+apache-beam[gcp]==2.47.0
+db-dtypes==1.2.0
