@@ -11,7 +11,6 @@ from tfx_bsl.public import tfxio
 
 # We will query for candidate data directly in the trainer.
 from google.cloud import bigquery
-import config
 
 from pipeline.modules.transform_module import transformed_name, LABEL_KEY
 
@@ -117,8 +116,10 @@ def run_fn(fn_args: tfx.components.FnArgs):
 
     # Set up the candidate dataset for metrics by querying BigQuery directly.
     logging.info("Querying BigQuery for candidate products...")
-    client = bigquery.Client(project=config.PROJECT_ID)
-    products_df = client.query(config.BQ_PRODUCTS_QUERY).to_dataframe()
+    project_id = fn_args.custom_config["project_id"]
+    products_query = fn_args.custom_config["products_query"]
+    client = bigquery.Client(project=project_id)
+    products_df = client.query(products_query).to_dataframe()
     logging.info(f"Found {len(products_df)} candidate products.")
 
     # Create a tf.data.Dataset from the product IDs.

@@ -66,6 +66,8 @@ def create_pipeline(
         eval_args=tfx.proto.EvalArgs(num_steps=config.EVAL_STEPS),
         custom_config={
             "epochs": config.TRAIN_EPOCHS,
+            "project_id": config.PROJECT_ID,
+            "products_query": config.BQ_PRODUCTS_QUERY,
         },
     )
 
