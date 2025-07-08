@@ -1,25 +1,21 @@
-# Pin major frameworks to known compatible versions to ensure stability and
-# avoid dependency conflicts in a clean environment.
-tfx[vertex_ai]==1.16.0
-tensorflow==2.16.1
-apache-beam[gcp]==2.56.0
+# Core TFX and TensorFlow - using stable versions
+tfx==1.15.0
+tensorflow==2.15.0
+apache-beam[gcp]==2.53.0
 
-# TFX 1.16.0 requires a specific range for pyarrow.
-pyarrow==10.0.1
-
-# tensorflow-data-validation (a dependency of TFX) requires pandas < 2.0.
+# Data processing
 pandas==1.5.3
-
-# Other project dependencies
+pyarrow==10.0.1
 pandas-gbq>=0.19.0
+
+# Recommenders
 tensorflow-recommenders>=0.7.0
-tensorflow-datasets
 
-# Vertex AI dependencies - these are required for Vertex AI orchestration
-google-cloud-aiplatform>=1.36.1,<2.0.0
-kfp>=2.0.0,<3.0.0
-google-cloud-pipeline-components>=2.0.0
+# Google Cloud dependencies - minimal set
+google-cloud-bigquery>=3.0.0
+google-cloud-storage>=2.0.0
+google-cloud-aiplatform>=1.25.0
 
-# Additional required dependencies for TFX on Vertex AI
-ml-metadata>=1.14.0
-tfx-bsl>=1.16.0
+# Required for TFX
+absl-py>=1.0.0
+ml-metadata>=1.15.0

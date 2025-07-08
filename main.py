@@ -2,7 +2,10 @@
 
 import os
 from absl import app, flags, logging
-from tfx.orchestration.kubeflow.v2 import kubeflow_v2_dag_runner
+from tfx.orchestration.local.local_dag_runner import LocalDagRunner
+from tfx.orchestration.experimental.interactive.interactive_context import (
+    InteractiveContext,
+)
 from pipeline.pipeline import create_pipeline
 import config
 
@@ -10,16 +13,10 @@ FLAGS = flags.FLAGS
 
 
 def run_pipeline():
-    """Run the pipeline on Vertex AI."""
+    """Run the pipeline locally first, then can be adapted for Vertex AI."""
 
-    runner = kubeflow_v2_dag_runner.KubeflowV2DagRunner(
-        config=kubeflow_v2_dag_runner.KubeflowV2DagRunnerConfig(
-            project_id=config.VERTEX_PROJECT_ID,
-            display_name=config.PIPELINE_NAME,
-            default_image=f"gcr.io/{config.VERTEX_PROJECT_ID}/tfx-pipeline",
-        ),
-        output_filename=f"{config.PIPELINE_NAME}.json",
-    )
+    # Use local runner for development and testing
+    runner = LocalDagRunner()
 
     pipeline = create_pipeline(
         pipeline_name=config.PIPELINE_NAME,
@@ -29,14 +26,19 @@ def run_pipeline():
         region=config.VERTEX_REGION,
     )
 
-    runner.run(
-        pipeline=pipeline,
-        project_id=config.VERTEX_PROJECT_ID,
-        region=config.VERTEX_REGION,
-    )
+    logging.info(f"Running pipeline: {config.PIPELINE_NAME}")
+    logging.info(f"Pipeline root: {config.PIPELINE_ROOT}")
+
+    runner.run(pipeline)
 
 
 def main(_):
+    logging.set_verbosity(logging.INFO)
+    run_pipeline()
+
+
+if __name__ == "__main__":
+    app.run(main)
     logging.set_verbosity(logging.INFO)
     run_pipeline()
 

@@ -1,12 +1,11 @@
 """Metro recommendations pipeline definition."""
 
 import os
-from typing import Optional, List
+from typing import Optional
 from absl import logging
-import tfx
+from tfx import v1 as tfx
 from tfx.orchestration import metadata
 from tfx.orchestration import pipeline
-from tfx.components import BigQueryExampleGen, StatisticsGen, SchemaGen, Transform, Trainer, Evaluator, Pusher
 
 import config
 
@@ -36,46 +35,46 @@ def create_pipeline(
     """
 
     # Data ingestion from BigQuery
-    example_gen = BigQueryExampleGen(query=query)
+    example_gen = tfx.extensions.google_cloud_big_query.BigQueryExampleGen(query=query)
 
     # Generate statistics
-    statistics_gen = StatisticsGen(examples=example_gen.outputs["examples"])
+    statistics_gen = tfx.components.StatisticsGen(
+        examples=example_gen.outputs["examples"]
+    )
 
     # Generate schema
-    schema_gen = SchemaGen(
+    schema_gen = tfx.components.SchemaGen(
         statistics=statistics_gen.outputs["statistics"], infer_feature_shape=False
     )
 
     # Data transformation
-    transform = Transform(
+    transform = tfx.components.Transform(
         examples=example_gen.outputs["examples"],
         schema=schema_gen.outputs["schema"],
         module_file=os.path.abspath("pipeline/modules/transform_module.py"),
     )
 
     # Model training
-    trainer = Trainer(
+    trainer = tfx.components.Trainer(
         module_file=os.path.abspath("pipeline/modules/trainer_module.py"),
         examples=transform.outputs["transformed_examples"],
         transform_graph=transform.outputs["transform_graph"],
-        schema=transform.outputs["post_transform_schema"],
+        schema=schema_gen.outputs["schema"],
         train_args=tfx.proto.TrainArgs(num_steps=config.TRAIN_STEPS),
         eval_args=tfx.proto.EvalArgs(num_steps=config.EVAL_STEPS),
         custom_config={
             "epochs": config.TRAIN_EPOCHS,
-            "products": transform.outputs["transformed_examples"],
         },
     )
 
-    # Model evaluation (replacing deprecated ModelValidator)
-    evaluator = Evaluator(
+    # Model evaluation
+    evaluator = tfx.components.Evaluator(
         examples=example_gen.outputs["examples"],
         model=trainer.outputs["model"],
-        baseline_model=trainer.outputs.get("baseline_model"),
     )
 
     # Model pusher (deployment)
-    pusher = Pusher(
+    pusher = tfx.components.Pusher(
         model=trainer.outputs["model"],
         model_blessing=evaluator.outputs["blessing"],
         push_destination=tfx.proto.PushDestination(
