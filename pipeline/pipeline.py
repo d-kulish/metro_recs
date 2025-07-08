@@ -84,10 +84,15 @@ def create_pipeline(
         # pusher,
     ]
 
+    pipeline_kwargs = {
+        "pipeline_name": pipeline_name,
+        "pipeline_root": pipeline_root,
+        "components": components,
+        "enable_cache": enable_cache,
+    }
+    if metadata_connection_config:
+        pipeline_kwargs["metadata_connection_config"] = metadata_connection_config
+
     return pipeline.Pipeline(
-        pipeline_name=pipeline_name,
-        pipeline_root=pipeline_root,
-        components=components,
-        enable_cache=enable_cache,
-        metadata_connection_config=metadata_connection_config,
+        **pipeline_kwargs
     )
