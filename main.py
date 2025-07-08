@@ -85,13 +85,22 @@ def run_pipeline():
                 location=config.VERTEX_REGION,
             )
 
-            logging.info(f"Submitting pipeline job: {job.display_name}")
+            logging.info(f"Submitting pipeline job: {config.PIPELINE_NAME}")
             job.submit()
 
             logging.info(
                 f"Pipeline submitted successfully. Job name: {job.resource_name}"
             )
-            logging.info(f"You can view the pipeline at: {job._dashboard_uri()}")
+
+            # Try to get the dashboard URI, but handle the case where it might not be available
+            try:
+                dashboard_uri = job._dashboard_uri()
+                logging.info(f"You can view the pipeline at: {dashboard_uri}")
+            except Exception as e:
+                logging.info(
+                    f"Pipeline submitted. Check Vertex AI Pipelines console for status."
+                )
+                logging.debug(f"Could not get dashboard URI: {e}")
 
     else:
         from tfx.orchestration.local.local_dag_runner import LocalDagRunner
