@@ -17,20 +17,54 @@ def run_pipeline():
     metadata_config = None
 
     if FLAGS.runner == "vertex":
-        from tfx.orchestration.experimental.kubeflow.v2.kubeflow_v2_dag_runner import (
-            KubeflowV2DagRunner,
-            KubeflowV2DagRunnerConfig,
-        )
+        try:
+            # Try the newer import path first
+            from tfx.orchestration.vertex.vertex_dag_runner import VertexDagRunner
+            from tfx.orchestration.vertex.vertex_dag_runner import VertexDagRunnerConfig
 
-        runner_config = KubeflowV2DagRunnerConfig(
-            display_name=config.PIPELINE_NAME,
-            project_id=config.VERTEX_PROJECT_ID,
-            default_image_uri=f"gcr.io/{config.VERTEX_PROJECT_ID}/tfx-pipeline",
-        )
-        runner = KubeflowV2DagRunner(config=runner_config)
-        metadata_config = (
-            tfx.orchestration.experimental.get_default_vertex_metadata_config()
-        )
+            runner_config = VertexDagRunnerConfig(
+                display_name=config.PIPELINE_NAME,
+                project_id=config.VERTEX_PROJECT_ID,
+                default_image_uri=config.PIPELINE_IMAGE,
+            )
+            runner = VertexDagRunner(config=runner_config)
+
+        except ImportError:
+            # Fallback to the experimental import if the above fails
+            try:
+                from tfx.orchestration.experimental.kubeflow.v2.kubeflow_v2_dag_runner import (
+                    KubeflowV2DagRunner,
+                    KubeflowV2DagRunnerConfig,
+                )
+
+                runner_config = KubeflowV2DagRunnerConfig(
+                    display_name=config.PIPELINE_NAME,
+                    project_id=config.VERTEX_PROJECT_ID,
+                    default_image_uri=config.PIPELINE_IMAGE,
+                )
+                runner = KubeflowV2DagRunner(config=runner_config)
+
+            except ImportError:
+                raise ImportError(
+                    "Unable to import Vertex AI runner. Please check your TFX installation."
+                )
+
+        # Get metadata config
+        try:
+            metadata_config = (
+                tfx.orchestration.experimental.get_default_vertex_metadata_config()
+            )
+        except AttributeError:
+            # If the experimental method doesn't exist, try the newer location
+            try:
+                from tfx.orchestration.vertex import vertex_metadata_config
+
+                metadata_config = (
+                    vertex_metadata_config.get_default_vertex_metadata_config()
+                )
+            except ImportError:
+                logging.warning("Could not configure Vertex metadata. Using default.")
+                metadata_config = None
     else:
         from tfx.orchestration.local.local_dag_runner import LocalDagRunner
 

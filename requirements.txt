@@ -19,3 +19,4 @@ google-cloud-aiplatform>=1.25.0
 # Required for TFX
 absl-py>=1.0.0
 ml-metadata>=1.15.0
+tfx[gcp]
