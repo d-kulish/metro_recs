@@ -2,7 +2,7 @@
 
 import os
 from absl import app, flags, logging
-from tfx.orchestration.vertex import vertex_dag_runner
+from tfx.orchestration.kubeflow.v2 import kubeflow_v2_dag_runner
 from pipeline.pipeline import create_pipeline
 import config
 
@@ -12,8 +12,13 @@ FLAGS = flags.FLAGS
 def run_pipeline():
     """Run the pipeline on Vertex AI."""
 
-    runner = vertex_dag_runner.VertexDagRunner(
-        output_filename=f"{config.PIPELINE_NAME}.json"
+    runner = kubeflow_v2_dag_runner.KubeflowV2DagRunner(
+        config=kubeflow_v2_dag_runner.KubeflowV2DagRunnerConfig(
+            project_id=config.VERTEX_PROJECT_ID,
+            display_name=config.PIPELINE_NAME,
+            default_image=f"gcr.io/{config.VERTEX_PROJECT_ID}/tfx-pipeline",
+        ),
+        output_filename=f"{config.PIPELINE_NAME}.json",
     )
 
     pipeline = create_pipeline(

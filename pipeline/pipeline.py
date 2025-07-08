@@ -4,11 +4,10 @@ import os
 from typing import Optional, List
 from absl import logging
 import tfx
-from tfx import v1 as tfx
 from tfx.orchestration import metadata
 from tfx.orchestration import pipeline
+from tfx.components import BigQueryExampleGen, StatisticsGen, SchemaGen, Transform, Trainer, Evaluator, Pusher
 
-from pipeline.components.bq_example_gen import create_bigquery_example_gen
 import config
 
 
@@ -37,27 +36,25 @@ def create_pipeline(
     """
 
     # Data ingestion from BigQuery
-    example_gen = create_bigquery_example_gen(query=query, project_id=project_id)
+    example_gen = BigQueryExampleGen(query=query)
 
     # Generate statistics
-    statistics_gen = tfx.components.StatisticsGen(
-        examples=example_gen.outputs["examples"]
-    )
+    statistics_gen = StatisticsGen(examples=example_gen.outputs["examples"])
 
     # Generate schema
-    schema_gen = tfx.components.SchemaGen(
+    schema_gen = SchemaGen(
         statistics=statistics_gen.outputs["statistics"], infer_feature_shape=False
     )
 
     # Data transformation
-    transform = tfx.components.Transform(
+    transform = Transform(
         examples=example_gen.outputs["examples"],
         schema=schema_gen.outputs["schema"],
         module_file=os.path.abspath("pipeline/modules/transform_module.py"),
     )
 
     # Model training
-    trainer = tfx.components.Trainer(
+    trainer = Trainer(
         module_file=os.path.abspath("pipeline/modules/trainer_module.py"),
         examples=transform.outputs["transformed_examples"],
         transform_graph=transform.outputs["transform_graph"],
@@ -70,15 +67,17 @@ def create_pipeline(
         },
     )
 
-    # Model validation
-    model_validator = tfx.components.ModelValidator(
-        examples=example_gen.outputs["examples"], model=trainer.outputs["model"]
+    # Model evaluation (replacing deprecated ModelValidator)
+    evaluator = Evaluator(
+        examples=example_gen.outputs["examples"],
+        model=trainer.outputs["model"],
+        baseline_model=trainer.outputs.get("baseline_model"),
     )
 
     # Model pusher (deployment)
-    pusher = tfx.components.Pusher(
+    pusher = Pusher(
         model=trainer.outputs["model"],
-        model_blessing=model_validator.outputs["blessing"],
+        model_blessing=evaluator.outputs["blessing"],
         push_destination=tfx.proto.PushDestination(
             filesystem=tfx.proto.PushDestination.Filesystem(
                 base_directory=os.path.join(pipeline_root, "serving_model")
@@ -92,7 +91,7 @@ def create_pipeline(
         schema_gen,
         transform,
         trainer,
-        model_validator,
+        evaluator,
         pusher,
     ]
 

@@ -15,6 +15,11 @@ pandas-gbq>=0.19.0
 tensorflow-recommenders>=0.7.0
 tensorflow-datasets
 
-# Explicitly add the dependency for Vertex AI orchestration, which is normally
-# handled by the `[vertex_ai]` extra. This resolves silent installation failures.
+# Vertex AI dependencies - these are required for Vertex AI orchestration
 google-cloud-aiplatform>=1.36.1,<2.0.0
+kfp>=2.0.0,<3.0.0
+google-cloud-pipeline-components>=2.0.0
+
+# Additional required dependencies for TFX on Vertex AI
+ml-metadata>=1.14.0
+tfx-bsl>=1.16.0
