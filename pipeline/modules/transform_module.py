@@ -31,6 +31,8 @@ def preprocessing_fn(inputs):
                 tf.strings.strip(tf.strings.as_string(inputs[key])),
                 top_k=10000,
                 num_oov_buckets=1,
+                # Explicitly name the vocabulary file to match the trainer's expectation.
+                vocab_filename=f"vocabulary_{key}",
             )
 
     # Transform label if present
@@ -38,4 +40,3 @@ def preprocessing_fn(inputs):
         outputs[transformed_name(LABEL_KEY)] = tf.cast(inputs[LABEL_KEY], tf.float32)
 
     return outputs
-
