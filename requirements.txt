@@ -1,7 +1,7 @@
 # Core TFX and TensorFlow - using compatible versions
-tfx>=1.15.0,<1.16.0
-tensorflow>=2.15.0,<2.16.0
-apache-beam[gcp]>=2.53.0,<2.54.0
+tfx==1.15.0
+tensorflow==2.15.0
+apache-beam[gcp]==2.53.0
 
 # Data processing
 pandas>=1.5.0,<2.0.0
@@ -9,15 +9,15 @@ pyarrow>=10.0.0,<11.0.0
 pandas-gbq>=0.19.0
 
 # Recommenders
-tensorflow-recommenders>=0.7.0
+tensorflow-recommenders==0.7.3
 
 # Google Cloud dependencies - minimal set
-google-cloud-bigquery>=3.0.0
+google-cloud-bigquery==3.11.4
 google-cloud-storage>=2.0.0
-google-cloud-aiplatform>=1.25.0
+google-cloud-aiplatform>=1.35.0
 
 # Required for TFX
-absl-py>=1.0.0
+absl-py==1.4.0
 ml-metadata>=1.15.0
 tfx[gcp]
 

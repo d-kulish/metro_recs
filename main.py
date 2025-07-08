@@ -2,6 +2,8 @@
 
 from absl import app, flags, logging
 import tfx
+import os
+import tempfile
 
 from pipeline.pipeline import create_pipeline
 import config
@@ -17,73 +19,100 @@ def run_pipeline():
     metadata_config = None
 
     if FLAGS.runner == "vertex":
-        # For TFX >= 1.14, KubeflowV2DagRunner is the recommended runner for Vertex AI.
-        # We try it first.
-        try:
-            from tfx.orchestration.kubeflow.v2 import kubeflow_v2_dag_runner
+        # For Vertex AI, we need to compile and submit the pipeline
+        from tfx.orchestration.kubeflow.v2 import kubeflow_v2_dag_runner
+        from google.cloud import aiplatform
 
-            # The config now specifies the default image for all components.
-            runner_config = kubeflow_v2_dag_runner.KubeflowV2DagRunnerConfig(
-                display_name=config.PIPELINE_NAME,
-                default_image=config.PIPELINE_IMAGE,
-            )
+        # Use the correct parameter names for KubeflowV2DagRunnerConfig
+        runner_config = kubeflow_v2_dag_runner.KubeflowV2DagRunnerConfig(
+            display_name=config.PIPELINE_NAME,
+            default_image_uri=config.PIPELINE_IMAGE,
+        )
+
+        # Create a temporary directory for the pipeline JSON
+        with tempfile.TemporaryDirectory() as temp_dir:
+            pipeline_json_path = os.path.join(temp_dir, f"{config.PIPELINE_NAME}.json")
+
             runner = kubeflow_v2_dag_runner.KubeflowV2DagRunner(
                 config=runner_config,
-                output_dir=config.PIPELINE_ROOT,
+                output_filename=pipeline_json_path,
             )
-            logging.info("Using KubeflowV2DagRunner for Vertex AI.")
 
-        except (ImportError, TypeError) as e:
-            logging.warning(f"Could not use KubeflowV2DagRunner, falling back to legacy runner. Error: {e}")
+            # Try to get metadata config
             try:
-                # Fallback to the legacy VertexRunner
-                from tfx.extensions.google_cloud_ai_platform.runner import vertex_runner
-
-                runner = vertex_runner.VertexRunner(
-                    project_id=config.VERTEX_PROJECT_ID,
-                    region=config.VERTEX_REGION,
-                    image_uri=config.PIPELINE_IMAGE,
+                from tfx.orchestration.experimental import (
+                    get_default_vertex_metadata_config,
                 )
-                logging.info("Using legacy VertexRunner for Vertex AI.")
 
-            except ImportError:
-                logging.fatal(
-                    "Neither KubeflowV2DagRunner nor the legacy VertexRunner are available. "
-                    "Please check your TFX installation and dependencies."
-                )
-                return
+                metadata_config = get_default_vertex_metadata_config()
+            except (ImportError, AttributeError):
+                logging.warning("Could not configure Vertex metadata. Using default.")
+                metadata_config = None
 
-        # Try to get metadata config
-        try:
-            from tfx.orchestration.experimental import (
-                get_default_vertex_metadata_config,
+            # Create the pipeline
+            pipeline = create_pipeline(
+                pipeline_name=config.PIPELINE_NAME,
+                pipeline_root=config.PIPELINE_ROOT,
+                query=config.BQ_QUERY,
+                project_id=config.PROJECT_ID,
+                region=config.LOCATION,
+                metadata_connection_config=metadata_config,
             )
 
-            metadata_config = get_default_vertex_metadata_config()
-        except (ImportError, AttributeError):
-            logging.warning("Could not configure Vertex metadata. Using default.")
-            metadata_config = None
+            logging.info(
+                f"Compiling pipeline '{config.PIPELINE_NAME}' with runner '{FLAGS.runner}'"
+            )
+            logging.info(f"Pipeline root: {config.PIPELINE_ROOT}")
+
+            # Compile the pipeline
+            runner.run(pipeline)
+
+            # Now submit the compiled pipeline to Vertex AI
+            logging.info("Submitting pipeline to Vertex AI...")
+
+            # Initialize Vertex AI client
+            aiplatform.init(
+                project=config.VERTEX_PROJECT_ID,
+                location=config.VERTEX_REGION,
+            )
+
+            # Submit the pipeline
+            job = aiplatform.PipelineJob(
+                display_name=config.PIPELINE_NAME,
+                template_path=pipeline_json_path,
+                pipeline_root=config.PIPELINE_ROOT,
+                project=config.VERTEX_PROJECT_ID,
+                location=config.VERTEX_REGION,
+            )
+
+            logging.info(f"Submitting pipeline job: {job.display_name}")
+            job.submit()
+
+            logging.info(
+                f"Pipeline submitted successfully. Job name: {job.resource_name}"
+            )
+            logging.info(f"You can view the pipeline at: {job._dashboard_uri()}")
+
     else:
         from tfx.orchestration.local.local_dag_runner import LocalDagRunner
 
         runner = LocalDagRunner()
-        # Don't set metadata_config for local runs - let it use default
 
-    pipeline = create_pipeline(
-        pipeline_name=config.PIPELINE_NAME,
-        pipeline_root=config.PIPELINE_ROOT,
-        query=config.BQ_QUERY,
-        project_id=config.PROJECT_ID,
-        region=config.LOCATION,
-        metadata_connection_config=metadata_config,
-    )
+        pipeline = create_pipeline(
+            pipeline_name=config.PIPELINE_NAME,
+            pipeline_root=config.PIPELINE_ROOT,
+            query=config.BQ_QUERY,
+            project_id=config.PROJECT_ID,
+            region=config.LOCATION,
+            metadata_connection_config=None,
+        )
 
-    logging.info(
-        f"Running pipeline '{config.PIPELINE_NAME}' with runner '{FLAGS.runner}'"
-    )
-    logging.info(f"Pipeline root: {config.PIPELINE_ROOT}")
+        logging.info(
+            f"Running pipeline '{config.PIPELINE_NAME}' with runner '{FLAGS.runner}'"
+        )
+        logging.info(f"Pipeline root: {config.PIPELINE_ROOT}")
 
-    runner.run(pipeline)
+        runner.run(pipeline)
 
 
 def main(_):
