@@ -69,22 +69,9 @@ def create_pipeline(
         },
     )
 
-    # Model evaluation
-    evaluator = tfx.components.Evaluator(
-        examples=example_gen.outputs["examples"],
-        model=trainer.outputs["model"],
-    )
-
-    # Model pusher (deployment)
-    pusher = tfx.components.Pusher(
-        model=trainer.outputs["model"],
-        model_blessing=evaluator.outputs["blessing"],
-        push_destination=tfx.proto.PushDestination(
-            filesystem=tfx.proto.PushDestination.Filesystem(
-                base_directory=os.path.join(pipeline_root, "serving_model")
-            )
-        ),
-    )
+    # NOTE: The standard Evaluator and Pusher are commented out because they
+    # require a specific EvalConfig to work with a TFRS retrieval model.
+    # For now, we will run the pipeline up to the Trainer to get a trained model.
 
     components = [
         example_gen,
@@ -92,8 +79,8 @@ def create_pipeline(
         schema_gen,
         transform,
         trainer,
-        evaluator,
-        pusher,
+        # evaluator,
+        # pusher,
     ]
 
     return pipeline.Pipeline(
