@@ -1,29 +1,21 @@
 """Trainer module for Metro recommendations model."""
 
 from typing import Dict, List, Text
-import os
-import glob
 import tensorflow as tf
 import tensorflow_transform as tft
 import tensorflow_recommenders as tfrs
 from absl import logging
 
-from tfx.types import artifact_utils
 from tfx import v1 as tfx
-from tfx_bsl.coders import example_coder
 from tfx_bsl.public import tfxio
+
+# We will query for candidate data directly in the trainer.
+from google.cloud import bigquery
+import config
 
 from pipeline.modules.transform_module import transformed_name, LABEL_KEY
 
 EMBEDDING_DIMENSION = 32
-
-def extract_str_feature(dataset, feature_name):
-    """Extract string feature from dataset."""
-    np_dataset = []
-    for example in dataset:
-        np_example = example_coder.ExampleToNumpyDict(example.numpy())
-        np_dataset.append(np_example[feature_name][0].decode())
-    return tf.data.Dataset.from_tensor_slices(np_dataset)
 
 
 class MetroRecommendationModel(tfrs.Model):
@@ -123,22 +115,22 @@ def run_fn(fn_args: tfx.components.FnArgs):
         log_dir=fn_args.model_run_dir, update_freq="batch"
     )
 
-    # Set up the candidate dataset for metrics
-    # Access the artifact from the 'hyperparameters' channel, which we are
-    # using as a side-channel to pass the products.
-    products_artifact = fn_args.hyperparameters[0]
-    input_dir = artifact_utils.get_split_uri([products_artifact], "train")
-    product_files = glob.glob(os.path.join(input_dir, "*"))
-    products_ds = tf.data.TFRecordDataset(product_files, compression_type="GZIP")
+    # Set up the candidate dataset for metrics by querying BigQuery directly.
+    logging.info("Querying BigQuery for candidate products...")
+    client = bigquery.Client(project=config.PROJECT_ID)
+    products_df = client.query(config.BQ_PRODUCTS_QUERY).to_dataframe()
+    logging.info(f"Found {len(products_df)} candidate products.")
 
-    def parse_product_example(proto):
-        return tf.io.parse_single_example(
-            proto, {"product_id": tf.io.FixedLenFeature([], tf.string)}
-        )
+    # Create a tf.data.Dataset from the product IDs.
+    products_ds = tf.data.Dataset.from_tensor_slices(
+        products_df["product_id"].astype(str)
+    )
 
-    candidates = products_ds.map(parse_product_example).map(tft_layer).map(
-        lambda x: x[transformed_name("product_id")]
-    ).batch(4096).map(model.product_model)
+    # Create a dataset of dictionaries for the TFT layer and map to embeddings.
+    products_dict_ds = products_ds.map(lambda x: {"product_id": x})
+    candidates = products_dict_ds.batch(4096).map(tft_layer).map(
+        lambda x: model.product_model(x[transformed_name("product_id")])
+    )
 
     model.task.factorized_metrics = tfrs.metrics.FactorizedTopK(candidates=candidates)
 
@@ -154,10 +146,10 @@ def run_fn(fn_args: tfx.components.FnArgs):
     # Create and save retrieval index
     index = tfrs.layers.factorized_top_k.BruteForce(model.user_model)
     index.index_from_dataset(
-        dataset=products_ds.map(parse_product_example).batch(4096).map(
+        dataset=products_dict_ds.batch(4096).map(
             lambda x: (
                 x["product_id"],
-                model.product_model(tft_layer(x)[transformed_name("product_id")]),
+                model.product_model(tft_layer(x)[transformed_name("product_id")])
             )
         )
     )

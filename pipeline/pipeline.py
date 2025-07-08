@@ -39,12 +39,6 @@ def create_pipeline(
         query=query
     ).with_id("bq-interactions-gen")
 
-    # Data ingestion for all unique products (candidates for retrieval).
-    # This uses the new query defined in the config.
-    product_gen = tfx.extensions.google_cloud_big_query.BigQueryExampleGen(
-        query=config.BQ_PRODUCTS_QUERY
-    ).with_id("bq-products-gen")
-
     # Generate statistics
     statistics_gen = tfx.components.StatisticsGen(
         examples=example_gen.outputs["examples"]
@@ -70,10 +64,6 @@ def create_pipeline(
         schema=transform.outputs["post_transform_schema"],
         train_args=tfx.proto.TrainArgs(num_steps=config.TRAIN_STEPS),
         eval_args=tfx.proto.EvalArgs(num_steps=config.EVAL_STEPS),
-        # We pass the products artifact through the `hyperparameters` channel.
-        # This is a workaround for the standard Trainer not having a dedicated
-        # channel for candidate sets.
-        hyperparameters=product_gen.outputs["examples"],
         custom_config={
             "epochs": config.TRAIN_EPOCHS,
         },
@@ -98,7 +88,6 @@ def create_pipeline(
 
     components = [
         example_gen,
-        product_gen,
         statistics_gen,
         schema_gen,
         transform,
