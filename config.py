@@ -24,6 +24,17 @@ WHERE
   AND city = "TERNOPIL"
 """
 
+BQ_PRODUCTS_QUERY = """
+SELECT DISTINCT
+  (invoices.art_no * 1000000 + invoices.var_tu_key) AS product_id
+FROM
+  `cf-mccuagcf-recommenders-ht.segmentation.ml_bi_invoices_tbl` AS invoices
+WHERE
+  invoices.month_id = 202506
+  AND invoices.flag_cust_target_group = "SCO"
+  AND sell_val_nsp > 0
+  AND city = "TERNOPIL"
+"""
 # Vertex AI settings
 VERTEX_PROJECT_ID = PROJECT_ID
 VERTEX_REGION = "europe-west4"

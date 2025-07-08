@@ -34,8 +34,14 @@ def create_pipeline(
         TFX Pipeline instance
     """
 
-    # Data ingestion from BigQuery
+    # Data ingestion for training examples (user-product interactions)
     example_gen = tfx.extensions.google_cloud_big_query.BigQueryExampleGen(query=query)
+
+    # Data ingestion for all unique products (candidates for retrieval).
+    # This uses the new query defined in the config.
+    product_gen = tfx.extensions.google_cloud_big_query.BigQueryExampleGen(
+        query=config.BQ_PRODUCTS_QUERY
+    )
 
     # Generate statistics
     statistics_gen = tfx.components.StatisticsGen(
@@ -64,6 +70,7 @@ def create_pipeline(
         eval_args=tfx.proto.EvalArgs(num_steps=config.EVAL_STEPS),
         custom_config={
             "epochs": config.TRAIN_EPOCHS,
+            "products": product_gen.outputs["examples"],
         },
     )
 
@@ -86,6 +93,7 @@ def create_pipeline(
 
     components = [
         example_gen,
+        product_gen,
         statistics_gen,
         schema_gen,
         transform,
