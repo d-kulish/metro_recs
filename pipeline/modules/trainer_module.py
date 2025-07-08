@@ -10,8 +10,13 @@ from absl import logging
 from tfx.types import artifact_utils
 from tfx import v1 as tfx
 from tfx_bsl.coders import example_coder
+from pipeline.modules.transform_module import transformed_name
 
 EMBEDDING_DIMENSION = 32
+
+# Feature names
+LABEL_KEY = "sell_val_nsp"
+FEATURE_KEYS = ["cust_person_id", "product_id", "city"]
 
 
 def extract_str_feature(dataset, feature_name):
@@ -57,45 +62,68 @@ class MetroRecommendationModel(tfrs.Model):
             raise
 
 
-def _build_user_model(
-    tf_transform_output: tft.TFTransformOutput, embedding_dimension: int = 32
-) -> tf.keras.Model:
-    """Build user embedding model."""
-    unique_user_ids = tf_transform_output.vocabulary_by_name("user_id_vocab")
-    users_vocab_str = [b.decode() for b in unique_user_ids]
+def _get_serve_tf_examples_fn(model, tf_transform_output):
+    """Returns a function that parses a serialized tf.Example."""
 
-    return tf.keras.Sequential(
-        [
-            tf.keras.layers.StringLookup(vocabulary=users_vocab_str, mask_token=None),
-            tf.keras.layers.Embedding(len(users_vocab_str) + 1, embedding_dimension),
-        ]
-    )
+    model.tft_layer = tf_transform_output.transform_features_layer()
 
+    @tf.function
+    def serve_tf_examples_fn(serialized_tf_examples):
+        """Returns the output to be used in the serving signature."""
+        feature_spec = tf_transform_output.raw_feature_spec()
+        feature_spec.pop(LABEL_KEY)
+        parsed_features = tf.io.parse_example(serialized_tf_examples, feature_spec)
+        transformed_features = model.tft_layer(parsed_features)
+        return model(transformed_features)
 
-def _build_product_model(
-    tf_transform_output: tft.TFTransformOutput, embedding_dimension: int = 32
-) -> tf.keras.Model:
-    """Build product embedding model."""
-    unique_product_ids = tf_transform_output.vocabulary_by_name("product_id_vocab")
-    products_vocab_str = [b.decode() for b in unique_product_ids]
-
-    return tf.keras.Sequential(
-        [
-            tf.keras.layers.StringLookup(
-                vocabulary=products_vocab_str, mask_token=None
-            ),
-            tf.keras.layers.Embedding(len(products_vocab_str) + 1, embedding_dimension),
-        ]
-    )
+    return serve_tf_examples_fn
 
 
-def _input_fn(file_pattern, data_accessor, tf_transform_output, batch_size=200):
-    """Create input function for training."""
+def _input_fn(
+    file_pattern: str, data_accessor, tf_transform_output, batch_size: int = 200
+) -> tf.data.Dataset:
+    """Generates features and label for training."""
+
     return data_accessor.tf_dataset_factory(
         file_pattern,
-        tfx.components.DataAccessor.TensorFlowDatasetOptions(batch_size=batch_size),
-        tf_transform_output.transformed_metadata.schema,
+        tfxio.TensorFlowDatasetOptions(
+            batch_size=batch_size, label_key=transformed_name(LABEL_KEY)
+        ),
+        schema=tf_transform_output.transformed_metadata.schema,
     )
+
+
+def _build_keras_model() -> tf.keras.Model:
+    """Creates a simple recommendation model."""
+
+    inputs = {}
+    for key in FEATURE_KEYS:
+        inputs[transformed_name(key)] = tf.keras.Input(
+            shape=(), name=transformed_name(key), dtype=tf.int64
+        )
+
+    # Simple embedding model
+    user_embedding = tf.keras.utils.get_custom_objects().get(
+        "Embedding", tf.keras.layers.Embedding
+    )(input_dim=10000, output_dim=32)(inputs[transformed_name("cust_person_id")])
+
+    item_embedding = tf.keras.utils.get_custom_objects().get(
+        "Embedding", tf.keras.layers.Embedding
+    )(input_dim=10000, output_dim=32)(inputs[transformed_name("product_id")])
+
+    # Dot product
+    output = tf.keras.layers.Dot(axes=1)([user_embedding, item_embedding])
+    output = tf.keras.layers.Dense(1, activation="sigmoid")(output)
+
+    model = tf.keras.Model(inputs=inputs, outputs=output)
+
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=0.001),
+        loss="binary_crossentropy",
+        metrics=["accuracy"],
+    )
+
+    return model
 
 
 def run_fn(fn_args: tfx.components.FnArgs):
@@ -133,6 +161,12 @@ def run_fn(fn_args: tfx.components.FnArgs):
         validation_steps=fn_args.eval_steps,
         callbacks=[tensorboard_callback],
     )
+
+    signatures = {
+        "serving_default": _get_serve_tf_examples_fn(model, tf_transform_output)
+    }
+
+    model.save(fn_args.serving_model_dir, save_format="tf", signatures=signatures)
 
     # Create and save retrieval index
     index = tfrs.layers.factorized_top_k.BruteForce(model.user_model)

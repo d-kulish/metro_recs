@@ -1,11 +1,8 @@
 """Main entry point for Metro recommendations pipeline on Vertex AI."""
 
-import os
 from absl import app, flags, logging
 from tfx.orchestration.local.local_dag_runner import LocalDagRunner
-from tfx.orchestration.experimental.interactive.interactive_context import (
-    InteractiveContext,
-)
+
 from pipeline.pipeline import create_pipeline
 import config
 
@@ -33,12 +30,6 @@ def run_pipeline():
 
 
 def main(_):
-    logging.set_verbosity(logging.INFO)
-    run_pipeline()
-
-
-if __name__ == "__main__":
-    app.run(main)
     logging.set_verbosity(logging.INFO)
     run_pipeline()
 

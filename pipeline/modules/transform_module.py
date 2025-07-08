@@ -1,43 +1,41 @@
-"""Transform module for preprocessing BigQuery data."""
+"""Transform module for Metro recommendations."""
 
 import tensorflow as tf
 import tensorflow_transform as tft
 
-NUM_OOV_BUCKETS = 1
+# Feature names
+LABEL_KEY = "sell_val_nsp"
+FEATURE_KEYS = ["cust_person_id", "product_id", "city"]
+
+
+def transformed_name(key):
+    """Generate transformed feature name."""
+    return key + "_xf"
 
 
 def preprocessing_fn(inputs):
-    """Preprocessing function for BigQuery data."""
+    """tf.transform's callback function for preprocessing inputs.
+
+    Args:
+        inputs: map from feature keys to raw not-yet-transformed features.
+
+    Returns:
+        Map from string feature key to transformed feature operations.
+    """
     outputs = {}
 
-    # Process user_id and product_id
-    outputs["user_id"] = tft.sparse_tensor_to_dense_with_shape(
-        inputs["user_id"], [None, 1], "-1"
-    )
-    outputs["product_id"] = tft.sparse_tensor_to_dense_with_shape(
-        inputs["product_id"], [None, 1], "-1"
-    )
+    # Transform categorical features
+    for key in FEATURE_KEYS:
+        if key in inputs:
+            outputs[transformed_name(key)] = tft.compute_and_apply_vocabulary(
+                tf.strings.strip(tf.strings.as_string(inputs[key])),
+                top_k=10000,
+                num_oov_buckets=1,
+            )
 
-    # Create vocabularies for user_id and product_id
-    tft.compute_and_apply_vocabulary(
-        inputs["user_id"],
-        num_oov_buckets=NUM_OOV_BUCKETS,
-        vocab_filename="user_id_vocab",
-    )
-
-    tft.compute_and_apply_vocabulary(
-        inputs["product_id"],
-        num_oov_buckets=NUM_OOV_BUCKETS,
-        vocab_filename="product_id_vocab",
-    )
-
-    # Optional: include other features like city, sell_val_nsp
-    if "city" in inputs:
-        outputs["city"] = tft.sparse_tensor_to_dense_with_shape(
-            inputs["city"], [None, 1], "-1"
-        )
-        tft.compute_and_apply_vocabulary(
-            inputs["city"], num_oov_buckets=NUM_OOV_BUCKETS, vocab_filename="city_vocab"
-        )
+    # Transform label if present
+    if LABEL_KEY in inputs:
+        outputs[transformed_name(LABEL_KEY)] = tf.cast(inputs[LABEL_KEY], tf.float32)
 
     return outputs
+

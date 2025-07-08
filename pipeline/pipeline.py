@@ -4,8 +4,8 @@ import os
 from typing import Optional
 from absl import logging
 from tfx import v1 as tfx
-from tfx.orchestration import metadata
 from tfx.orchestration import pipeline
+from ml_metadata.proto import metadata_store_pb2
 
 import config
 
@@ -17,7 +17,7 @@ def create_pipeline(
     project_id: str,
     region: str,
     enable_cache: bool = True,
-    metadata_connection_config: Optional[metadata.ConnectionConfig] = None,
+    metadata_connection_config: Optional[metadata_store_pb2.ConnectionConfig] = None,
 ) -> pipeline.Pipeline:
     """Create TFX pipeline for Metro recommendations.
 
