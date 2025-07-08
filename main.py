@@ -18,53 +18,59 @@ def run_pipeline():
 
     if FLAGS.runner == "vertex":
         try:
-            # Try the newer import path first
-            from tfx.orchestration.vertex.vertex_dag_runner import VertexDagRunner
-            from tfx.orchestration.vertex.vertex_dag_runner import VertexDagRunnerConfig
+            # For TFX 1.15.0, try the Google Cloud AI Platform runner
+            from tfx.extensions.google_cloud_ai_platform.runner import vertex_runner
 
-            runner_config = VertexDagRunnerConfig(
-                display_name=config.PIPELINE_NAME,
+            runner = vertex_runner.VertexRunner(
                 project_id=config.VERTEX_PROJECT_ID,
-                default_image_uri=config.PIPELINE_IMAGE,
+                region=config.VERTEX_REGION,
+                image_uri=config.PIPELINE_IMAGE,
             )
-            runner = VertexDagRunner(config=runner_config)
 
         except ImportError:
-            # Fallback to the experimental import if the above fails
             try:
-                from tfx.orchestration.experimental.kubeflow.v2.kubeflow_v2_dag_runner import (
-                    KubeflowV2DagRunner,
-                    KubeflowV2DagRunnerConfig,
-                )
+                # Alternative: Try the Kubeflow V2 runner which should be available
+                from tfx.orchestration.kubeflow.v2 import kubeflow_v2_dag_runner
 
-                runner_config = KubeflowV2DagRunnerConfig(
-                    display_name=config.PIPELINE_NAME,
+                runner_config = kubeflow_v2_dag_runner.KubeflowV2DagRunnerConfig(
                     project_id=config.VERTEX_PROJECT_ID,
+                    region=config.VERTEX_REGION,
+                    display_name=config.PIPELINE_NAME,
                     default_image_uri=config.PIPELINE_IMAGE,
                 )
-                runner = KubeflowV2DagRunner(config=runner_config)
-
-            except ImportError:
-                raise ImportError(
-                    "Unable to import Vertex AI runner. Please check your TFX installation."
+                runner = kubeflow_v2_dag_runner.KubeflowV2DagRunner(
+                    config=runner_config
                 )
 
-        # Get metadata config
+            except ImportError:
+                # Final fallback: Try the beam runner with DataflowRunner
+                from tfx.orchestration.beam.beam_dag_runner import BeamDagRunner
+                from apache_beam.options.pipeline_options import PipelineOptions
+
+                beam_options = PipelineOptions(
+                    [
+                        f"--project={config.VERTEX_PROJECT_ID}",
+                        f"--region={config.VERTEX_REGION}",
+                        "--runner=DataflowRunner",
+                        f"--temp_location={config.PIPELINE_ROOT}/temp",
+                        f"--staging_location={config.PIPELINE_ROOT}/staging",
+                    ]
+                )
+
+                runner = BeamDagRunner(
+                    beam_pipeline_args=beam_options.get_all_options()
+                )
+
+        # Try to get metadata config
         try:
-            metadata_config = (
-                tfx.orchestration.experimental.get_default_vertex_metadata_config()
+            from tfx.orchestration.experimental import (
+                get_default_vertex_metadata_config,
             )
-        except AttributeError:
-            # If the experimental method doesn't exist, try the newer location
-            try:
-                from tfx.orchestration.vertex import vertex_metadata_config
 
-                metadata_config = (
-                    vertex_metadata_config.get_default_vertex_metadata_config()
-                )
-            except ImportError:
-                logging.warning("Could not configure Vertex metadata. Using default.")
-                metadata_config = None
+            metadata_config = get_default_vertex_metadata_config()
+        except (ImportError, AttributeError):
+            logging.warning("Could not configure Vertex metadata. Using default.")
+            metadata_config = None
     else:
         from tfx.orchestration.local.local_dag_runner import LocalDagRunner
 

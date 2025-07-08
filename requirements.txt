@@ -20,3 +20,6 @@ google-cloud-aiplatform>=1.25.0
 absl-py>=1.0.0
 ml-metadata>=1.15.0
 tfx[gcp]
+
+# Kubeflow dependencies for Vertex AI
+kfp>=1.8.0,<2.0.0
