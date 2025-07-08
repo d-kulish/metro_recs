@@ -83,24 +83,36 @@ def run_pipeline():
                 pipeline_root=config.PIPELINE_ROOT,
                 project=config.VERTEX_PROJECT_ID,
                 location=config.VERTEX_REGION,
+                # Don't specify service_account to use the default Vertex AI service account
+                enable_caching=True,
             )
 
             logging.info(f"Submitting pipeline job: {config.PIPELINE_NAME}")
-            job.submit()
 
-            logging.info(
-                f"Pipeline submitted successfully. Job name: {job.resource_name}"
-            )
-
-            # Try to get the dashboard URI, but handle the case where it might not be available
             try:
-                dashboard_uri = job._dashboard_uri()
-                logging.info(f"You can view the pipeline at: {dashboard_uri}")
-            except Exception as e:
+                job.submit()
                 logging.info(
-                    f"Pipeline submitted. Check Vertex AI Pipelines console for status."
+                    f"Pipeline submitted successfully. Job name: {job.resource_name}"
                 )
-                logging.debug(f"Could not get dashboard URI: {e}")
+
+                # Try to get the dashboard URI, but handle the case where it might not be available
+                try:
+                    dashboard_uri = job._dashboard_uri()
+                    logging.info(f"You can view the pipeline at: {dashboard_uri}")
+                except Exception as e:
+                    logging.info(
+                        f"Pipeline submitted. Check Vertex AI Pipelines console for status."
+                    )
+                    logging.debug(f"Could not get dashboard URI: {e}")
+
+            except Exception as e:
+                logging.error(f"Failed to submit pipeline: {e}")
+                logging.error("This might be a permissions issue. Please check:")
+                logging.error("1. Vertex AI API is enabled")
+                logging.error("2. Your service account has 'Vertex AI User' role")
+                logging.error("3. Your service account has 'Service Account User' role")
+                logging.error("4. BigQuery permissions for the dataset")
+                raise
 
     else:
         from tfx.orchestration.local.local_dag_runner import LocalDagRunner

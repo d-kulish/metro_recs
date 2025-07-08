@@ -100,6 +100,10 @@ PIPELINE_ROOT = "gs://recs_metroua/pipeline_root"
 # Use a public TFX image instead of building your own
 PIPELINE_IMAGE = "gcr.io/tfx-oss-public/tfx:1.15.0"
 
+# Service account settings - use the default Vertex AI service account
+# This avoids the compute service account permission issue
+VERTEX_SERVICE_ACCOUNT = f"vertex-pipelines@{PROJECT_ID}.iam.gserviceaccount.com"
+
 # Model settings
 EMBEDDING_DIMENSION = 32
 TRAIN_EPOCHS = 5
