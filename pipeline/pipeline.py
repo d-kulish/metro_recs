@@ -80,7 +80,6 @@ def create_pipeline(
     evaluator = tfx.components.Evaluator(
         examples=example_gen.outputs["examples"],
         model=trainer.outputs["model"],
-        transform_graph=transform.outputs["transform_graph"],
     )
 
     # Model pusher (deployment)
