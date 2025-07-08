@@ -71,19 +71,26 @@ def create_pipeline(
         },
     )
 
-    # NOTE: The standard Evaluator and Pusher are commented out because they
-    # require a specific EvalConfig to work with a TFRS retrieval model.
-    # For now, we will run the pipeline up to the Trainer to get a trained model.
-
+    # Set container image for all components when running on Vertex AI
     components = [
         example_gen,
         statistics_gen,
         schema_gen,
         transform,
         trainer,
-        # evaluator,
-        # pusher,
     ]
+
+    # Set the container image for each component
+    for component in components:
+        component.with_beam_pipeline_args(
+            [
+                f"--project={project_id}",
+                f"--region={region}",
+                "--runner=DataflowRunner",
+                f"--temp_location={pipeline_root}/temp",
+                f"--staging_location={pipeline_root}/staging",
+            ]
+        )
 
     pipeline_kwargs = {
         "pipeline_name": pipeline_name,
