@@ -32,14 +32,14 @@ def run_pipeline():
                 # Alternative: Try the Kubeflow V2 runner which should be available
                 from tfx.orchestration.kubeflow.v2 import kubeflow_v2_dag_runner
 
+                # Use the correct parameter names for KubeflowV2DagRunnerConfig
                 runner_config = kubeflow_v2_dag_runner.KubeflowV2DagRunnerConfig(
-                    project_id=config.VERTEX_PROJECT_ID,
-                    region=config.VERTEX_REGION,
                     display_name=config.PIPELINE_NAME,
                     default_image_uri=config.PIPELINE_IMAGE,
                 )
                 runner = kubeflow_v2_dag_runner.KubeflowV2DagRunner(
-                    config=runner_config
+                    config=runner_config,
+                    output_dir=config.PIPELINE_ROOT,
                 )
 
             except ImportError:
