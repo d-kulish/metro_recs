@@ -9,7 +9,6 @@ from ml_metadata.proto import metadata_store_pb2
 
 import config
 
-
 def create_pipeline(
     pipeline_name: str,
     pipeline_root: str,

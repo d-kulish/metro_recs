@@ -33,8 +33,8 @@ class MetroRecommendationModel(tfrs.Model):
         self, features: Dict[Text, tf.Tensor], training=False
     ) -> tf.Tensor:
         """Compute loss for training."""
-        # We need to handle the extra dimension added by TFT.
-        user_embeddings = self.user_model(features[transformed_name("cust_person_id")])
+        # The user model now expects a dictionary of features.
+        user_embeddings = self.user_model(features)
         positive_product_embeddings = self.product_model(
             features[transformed_name("product_id")]
         )
@@ -64,16 +64,43 @@ def _input_fn(
 def _build_user_model(
     tf_transform_output: tft.TFTransformOutput,
 ) -> tf.keras.Model:
-    """Builds the user model tower."""
-    vocab_size = tf_transform_output.vocabulary_size_by_name("vocabulary_cust_person_id")
-    user_id_input = tf.keras.Input(
-        shape=(1,), name=transformed_name("cust_person_id"), dtype=tf.int64
-    )
-    embedding = tf.keras.layers.Embedding(
-        input_dim=vocab_size, output_dim=EMBEDDING_DIMENSION
-    )(user_id_input)
-    return tf.keras.Model(inputs=user_id_input, outputs=tf.keras.layers.Flatten()(embedding))
+    """Builds the user model tower with multiple features."""
+    inputs = {
+        transformed_name("cust_person_id"): tf.keras.Input(shape=(1,), name=transformed_name("cust_person_id"), dtype=tf.int64),
+        transformed_name("city"): tf.keras.Input(shape=(1,), name=transformed_name("city"), dtype=tf.int64),
+        transformed_name("month"): tf.keras.Input(shape=(1,), name=transformed_name("month"), dtype=tf.int64),
+        transformed_name("day_of_month"): tf.keras.Input(shape=(1,), name=transformed_name("day_of_month"), dtype=tf.int64),
+        transformed_name("total_revenue_bucket"): tf.keras.Input(shape=(1,), name=transformed_name("total_revenue_bucket"), dtype=tf.int64),
+        transformed_name("total_revenue_normalized"): tf.keras.Input(shape=(1,), name=transformed_name("total_revenue_normalized"), dtype=tf.float32),
+    }
 
+    embeddings = []
+
+    # Create embeddings for all categorical features
+    for key, vocab_name, num_buckets in [
+        (transformed_name("cust_person_id"), "vocabulary_cust_person_id", None),
+        (transformed_name("city"), "vocabulary_city", None),
+        (transformed_name("month"), "vocabulary_month", None),
+        (transformed_name("day_of_month"), "vocabulary_day_of_month", None),
+        (transformed_name("total_revenue_bucket"), None, 100),
+    ]:
+        vocab_size = (num_buckets + 1) if num_buckets else tf_transform_output.vocabulary_size_by_name(vocab_name)
+        embedding_layer = tf.keras.layers.Embedding(
+            input_dim=vocab_size, output_dim=EMBEDDING_DIMENSION
+        )
+        embeddings.append(tf.keras.layers.Flatten()(embedding_layer(inputs[key])))
+
+    # Add the normalized revenue directly as a feature
+    embeddings.append(inputs[transformed_name("total_revenue_normalized")])
+
+    # Concatenate all features and build dense layers for the final embedding
+    concatenated_features = tf.keras.layers.concatenate(embeddings)
+    dense_output = tf.keras.layers.Dense(64, activation="relu")(
+        concatenated_features
+    )
+    dense_output = tf.keras.layers.Dense(EMBEDDING_DIMENSION)(dense_output)
+
+    return tf.keras.Model(inputs=inputs, outputs=dense_output)
 
 def _build_product_model(
     tf_transform_output: tft.TFTransformOutput,
@@ -160,15 +187,19 @@ def run_fn(fn_args: tfx.components.FnArgs):
     def serving_fn(serialized_tf_examples):
         raw_feature_spec = tf_transform_output.raw_feature_spec()
         serving_feature_spec = {
-            "cust_person_id": raw_feature_spec["cust_person_id"]
+            # We need all raw features that are inputs to the user model's
+            # branch of the transform graph.
+            "cust_person_id": raw_feature_spec["cust_person_id"],
+            "city": raw_feature_spec["city"],
+            "date_of_day": raw_feature_spec["date_of_day"],
+            "total_revenue": raw_feature_spec["total_revenue"],
         }
         parsed_features = tf.io.parse_example(
             serialized_tf_examples, serving_feature_spec
         )
         transformed_features = tft_layer(parsed_features)
-        user_embeddings = index._query_model(
-            transformed_features[transformed_name("cust_person_id")]
-        )
+        # The user model expects a dictionary of transformed features.
+        user_embeddings = index._query_model(transformed_features)
         _, titles = index(user_embeddings)
         return {"product_id": titles}
 

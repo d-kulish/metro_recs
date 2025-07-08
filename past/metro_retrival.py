@@ -112,15 +112,8 @@ def save_to_tf_records(df, output_dir, rows_per_file=1000):
                 example = tf.train.Example(features=tf.train.Features(feature={
                     'customer_id': tf.train.Feature(bytes_list=tf.train.BytesList(value=[row["cust_person_id"].encode()])),
                     'product_id': tf.train.Feature(bytes_list=tf.train.BytesList(value=[row["product_id"].encode()])),
-                    # 'segment': tf.train.Feature(bytes_list=tf.train.BytesList(value=[row["SEGMENT_GROUP"].encode()])),
-                    # "visits": tf.train.Feature(int64_list=tf.train.Int64List(value=[row["visits"]])),
                     "revenue": tf.train.Feature(int64_list=tf.train.Int64List(value=[row["sell_total_val_nsp"]])),
                     'city': tf.train.Feature(bytes_list=tf.train.BytesList(value=[row["city"].encode()])),
-                    # 'articul': tf.train.Feature(bytes_list=tf.train.BytesList(value=[row["art_name_tl"].encode()])),
-                    # 'category': tf.train.Feature(bytes_list=tf.train.BytesList(value=[row["pcg_cat_desc_tl"].encode()])),
-                    # 'sub_category': tf.train.Feature(bytes_list=tf.train.BytesList(value=[row["pcg_sub_cat_desc_tl"].encode()])),
-                    # "ts": tf.train.Feature(int64_list=tf.train.Int64List(value=[row["ts"]])),
-                    # 'rating': tf.train.Feature(int64_list=tf.train.Int64List(value=[row["sell_val_nsp"]])),
                     }))
 
                 writer.write(example.SerializeToString())
