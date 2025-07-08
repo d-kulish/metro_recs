@@ -97,6 +97,9 @@ VERTEX_REGION = "europe-west4"
 PIPELINE_NAME = "metro-recommendations-pipeline"
 PIPELINE_ROOT = "gs://recs_metroua/pipeline_root"
 
+# Docker image for Vertex AI (you may need to build and push this)
+PIPELINE_IMAGE = f"gcr.io/{PROJECT_ID}/tfx-pipeline"
+
 # Model settings
 EMBEDDING_DIMENSION = 32
 TRAIN_EPOCHS = 5

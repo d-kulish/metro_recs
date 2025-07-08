@@ -7,7 +7,7 @@ from pipeline.pipeline import create_pipeline
 import config
 
 FLAGS = flags.FLAGS
-flags.DEFINE_enum("runner", "local", ["local", "vertex"], "Pipeline runner to use.")
+flags.DEFINE_enum("runner", "vertex", ["local", "vertex"], "Pipeline runner to use.")
 
 
 def run_pipeline():
@@ -22,7 +22,11 @@ def run_pipeline():
             KubeflowV2DagRunnerConfig,
         )
 
-        runner_config = KubeflowV2DagRunnerConfig(display_name=config.PIPELINE_NAME)
+        runner_config = KubeflowV2DagRunnerConfig(
+            display_name=config.PIPELINE_NAME,
+            project_id=config.VERTEX_PROJECT_ID,
+            default_image_uri=f"gcr.io/{config.VERTEX_PROJECT_ID}/tfx-pipeline",
+        )
         runner = KubeflowV2DagRunner(config=runner_config)
         metadata_config = (
             tfx.orchestration.experimental.get_default_vertex_metadata_config()
