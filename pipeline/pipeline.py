@@ -67,7 +67,7 @@ def create_pipeline(
         module_file=os.path.abspath("pipeline/modules/trainer_module.py"),
         examples=transform.outputs["transformed_examples"],
         transform_graph=transform.outputs["transform_graph"],
-        schema=schema_gen.outputs["schema"],
+        schema=transform.outputs["post_transform_schema"],
         train_args=tfx.proto.TrainArgs(num_steps=config.TRAIN_STEPS),
         eval_args=tfx.proto.EvalArgs(num_steps=config.EVAL_STEPS),
         custom_config={
@@ -80,6 +80,7 @@ def create_pipeline(
     evaluator = tfx.components.Evaluator(
         examples=example_gen.outputs["examples"],
         model=trainer.outputs["model"],
+        transform_graph=transform.outputs["transform_graph"],
     )
 
     # Model pusher (deployment)
