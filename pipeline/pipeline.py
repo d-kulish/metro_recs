@@ -70,11 +70,13 @@ def create_pipeline(
         schema=transform.outputs["post_transform_schema"],
         train_args=tfx.proto.TrainArgs(num_steps=config.TRAIN_STEPS),
         eval_args=tfx.proto.EvalArgs(num_steps=config.EVAL_STEPS),
+        # We pass the products artifact through the `hyperparameters` channel.
+        # This is a workaround for the standard Trainer not having a dedicated
+        # channel for candidate sets.
+        hyperparameters=product_gen.outputs["examples"],
         custom_config={
             "epochs": config.TRAIN_EPOCHS,
         },
-        # Pass the products channel as a named keyword argument.
-        products=product_gen.outputs["examples"],
     )
 
     # Model evaluation
