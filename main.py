@@ -26,7 +26,7 @@ def run_pipeline():
         # Use the correct parameter names for KubeflowV2DagRunnerConfig
         runner_config = kubeflow_v2_dag_runner.KubeflowV2DagRunnerConfig(
             display_name=config.PIPELINE_NAME,
-            default_image_uri=config.PIPELINE_IMAGE,
+            default_image=config.PIPELINE_IMAGE,
         )
 
         # Create a temporary directory for the pipeline JSON
