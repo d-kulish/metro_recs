@@ -35,13 +35,15 @@ def create_pipeline(
     """
 
     # Data ingestion for training examples (user-product interactions)
-    example_gen = tfx.extensions.google_cloud_big_query.BigQueryExampleGen(query=query)
+    example_gen = tfx.extensions.google_cloud_big_query.BigQueryExampleGen(
+        query=query
+    ).with_id("bq-interactions-gen")
 
     # Data ingestion for all unique products (candidates for retrieval).
     # This uses the new query defined in the config.
     product_gen = tfx.extensions.google_cloud_big_query.BigQueryExampleGen(
         query=config.BQ_PRODUCTS_QUERY
-    )
+    ).with_id("bq-products-gen")
 
     # Generate statistics
     statistics_gen = tfx.components.StatisticsGen(
