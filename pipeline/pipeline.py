@@ -72,8 +72,9 @@ def create_pipeline(
         eval_args=tfx.proto.EvalArgs(num_steps=config.EVAL_STEPS),
         custom_config={
             "epochs": config.TRAIN_EPOCHS,
-            "products": product_gen.outputs["examples"],
         },
+        # Pass the products channel as a named keyword argument.
+        products=product_gen.outputs["examples"],
     )
 
     # Model evaluation

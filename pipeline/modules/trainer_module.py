@@ -124,7 +124,8 @@ def run_fn(fn_args: tfx.components.FnArgs):
     )
 
     # Set up the candidate dataset for metrics
-    products_artifact = fn_args.custom_config["products"].get()[0]
+    # Access the artifact from the named 'products' channel.
+    products_artifact = fn_args.products[0]
     input_dir = artifact_utils.get_split_uri([products_artifact], "train")
     product_files = glob.glob(os.path.join(input_dir, "*"))
     products_ds = tf.data.TFRecordDataset(product_files, compression_type="GZIP")
