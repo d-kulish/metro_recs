@@ -1,9 +1,16 @@
-pandas>=1.5.3
-pandas-gbq>=0.19.0
-pyarrow>=15.0.2
+# Pin major frameworks to known compatible versions to ensure stability and
+# avoid dependency conflicts in a clean environment.
+tfx[vertex_ai]==1.16.0
 tensorflow==2.16.1
+apache-beam[gcp]==2.56.0
+
+# TFX 1.16.0 requires a specific range for pyarrow.
+pyarrow==10.0.1
+
+# TFX-BSL (a dependency of TFX) requires a pandas 2.x version.
+pandas~=2.0.0
+
+# Other project dependencies
+pandas-gbq>=0.19.0
 tensorflow-recommenders>=0.7.0
 tensorflow-datasets
-tfx[vertex_ai]==1.16.0
-apache-beam[gcp]==2.56.0
-db-dtypes>=1.4.2
