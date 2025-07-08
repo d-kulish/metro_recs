@@ -9,6 +9,7 @@ from ml_metadata.proto import metadata_store_pb2
 
 import config
 
+
 def create_pipeline(
     pipeline_name: str,
     pipeline_root: str,
@@ -90,9 +91,9 @@ def create_pipeline(
         "components": components,
         "enable_cache": enable_cache,
     }
-    if metadata_connection_config:
+
+    # Only add metadata_connection_config if it's not None
+    if metadata_connection_config is not None:
         pipeline_kwargs["metadata_connection_config"] = metadata_connection_config
 
-    return pipeline.Pipeline(
-        **pipeline_kwargs
-    )
+    return pipeline.Pipeline(**pipeline_kwargs)

@@ -7,9 +7,7 @@ from pipeline.pipeline import create_pipeline
 import config
 
 FLAGS = flags.FLAGS
-flags.DEFINE_enum(
-    "runner", "local", ["local", "vertex"], "Pipeline runner to use."
-)
+flags.DEFINE_enum("runner", "local", ["local", "vertex"], "Pipeline runner to use.")
 
 
 def run_pipeline():
@@ -26,11 +24,14 @@ def run_pipeline():
 
         runner_config = KubeflowV2DagRunnerConfig(display_name=config.PIPELINE_NAME)
         runner = KubeflowV2DagRunner(config=runner_config)
-        metadata_config = tfx.orchestration.experimental.get_default_vertex_metadata_config()
+        metadata_config = (
+            tfx.orchestration.experimental.get_default_vertex_metadata_config()
+        )
     else:
         from tfx.orchestration.local.local_dag_runner import LocalDagRunner
 
         runner = LocalDagRunner()
+        # Don't set metadata_config for local runs - let it use default
 
     pipeline = create_pipeline(
         pipeline_name=config.PIPELINE_NAME,
@@ -41,7 +42,9 @@ def run_pipeline():
         metadata_connection_config=metadata_config,
     )
 
-    logging.info(f"Running pipeline '{config.PIPELINE_NAME}' with runner '{FLAGS.runner}'")
+    logging.info(
+        f"Running pipeline '{config.PIPELINE_NAME}' with runner '{FLAGS.runner}'"
+    )
     logging.info(f"Pipeline root: {config.PIPELINE_ROOT}")
 
     runner.run(pipeline)
