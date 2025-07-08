@@ -17,49 +17,41 @@ def run_pipeline():
     metadata_config = None
 
     if FLAGS.runner == "vertex":
+        # For TFX >= 1.14, KubeflowV2DagRunner is the recommended runner for Vertex AI.
+        # We try it first.
         try:
-            # For TFX 1.15.0, try the Google Cloud AI Platform runner
-            from tfx.extensions.google_cloud_ai_platform.runner import vertex_runner
+            from tfx.orchestration.kubeflow.v2 import kubeflow_v2_dag_runner
 
-            runner = vertex_runner.VertexRunner(
-                project_id=config.VERTEX_PROJECT_ID,
-                region=config.VERTEX_REGION,
-                image_uri=config.PIPELINE_IMAGE,
+            # The config now specifies the default image for all components.
+            runner_config = kubeflow_v2_dag_runner.KubeflowV2DagRunnerConfig(
+                display_name=config.PIPELINE_NAME,
+                default_image=config.PIPELINE_IMAGE,
             )
+            runner = kubeflow_v2_dag_runner.KubeflowV2DagRunner(
+                config=runner_config,
+                output_dir=config.PIPELINE_ROOT,
+            )
+            logging.info("Using KubeflowV2DagRunner for Vertex AI.")
 
-        except ImportError:
+        except (ImportError, TypeError) as e:
+            logging.warning(f"Could not use KubeflowV2DagRunner, falling back to legacy runner. Error: {e}")
             try:
-                # Alternative: Try the Kubeflow V2 runner which should be available
-                from tfx.orchestration.kubeflow.v2 import kubeflow_v2_dag_runner
+                # Fallback to the legacy VertexRunner
+                from tfx.extensions.google_cloud_ai_platform.runner import vertex_runner
 
-                # Simplified configuration - only use supported parameters
-                runner_config = kubeflow_v2_dag_runner.KubeflowV2DagRunnerConfig(
-                    display_name=config.PIPELINE_NAME,
+                runner = vertex_runner.VertexRunner(
+                    project_id=config.VERTEX_PROJECT_ID,
+                    region=config.VERTEX_REGION,
+                    image_uri=config.PIPELINE_IMAGE,
                 )
-                runner = kubeflow_v2_dag_runner.KubeflowV2DagRunner(
-                    config=runner_config,
-                    output_dir=config.PIPELINE_ROOT,
-                )
+                logging.info("Using legacy VertexRunner for Vertex AI.")
 
-            except (ImportError, TypeError) as e:
-                logging.warning(f"Kubeflow V2 runner failed: {e}")
-                # Final fallback: Try the beam runner with DataflowRunner
-                from tfx.orchestration.beam.beam_dag_runner import BeamDagRunner
-                from apache_beam.options.pipeline_options import PipelineOptions
-
-                beam_options = PipelineOptions(
-                    [
-                        f"--project={config.VERTEX_PROJECT_ID}",
-                        f"--region={config.VERTEX_REGION}",
-                        "--runner=DataflowRunner",
-                        f"--temp_location={config.PIPELINE_ROOT}/temp",
-                        f"--staging_location={config.PIPELINE_ROOT}/staging",
-                    ]
+            except ImportError:
+                logging.fatal(
+                    "Neither KubeflowV2DagRunner nor the legacy VertexRunner are available. "
+                    "Please check your TFX installation and dependencies."
                 )
-
-                runner = BeamDagRunner(
-                    beam_pipeline_args=beam_options.get_all_options()
-                )
+                return
 
         # Try to get metadata config
         try:

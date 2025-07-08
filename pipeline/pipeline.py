@@ -80,17 +80,20 @@ def create_pipeline(
         trainer,
     ]
 
-    # Set the container image for each component
+    # Set the Beam pipeline args for components that support it.
+    # This is needed to run the Beam-based components on Dataflow.
     for component in components:
-        component.with_beam_pipeline_args(
-            [
-                f"--project={project_id}",
-                f"--region={region}",
-                "--runner=DataflowRunner",
-                f"--temp_location={pipeline_root}/temp",
-                f"--staging_location={pipeline_root}/staging",
-            ]
-        )
+        # Not all components are Beam-based and support this method.
+        if hasattr(component, "with_beam_pipeline_args"):
+            component.with_beam_pipeline_args(
+                [
+                    f"--project={project_id}",
+                    f"--region={region}",
+                    "--runner=DataflowRunner",
+                    f"--temp_location={pipeline_root}/temp",
+                    f"--staging_location={pipeline_root}/staging",
+                ]
+            )
 
     pipeline_kwargs = {
         "pipeline_name": pipeline_name,
