@@ -206,7 +206,7 @@ def run_fn(fn_args: tfx.components.FnArgs):
     # Create and save retrieval index
     index = tfrs.layers.factorized_top_k.BruteForce(model.user_model)
     index.index_from_dataset(
-        dataset=products_dict_ds.batch(4096).map(
+        products_dict_ds.batch(4096).map(
             lambda x: (
                 x["product_id"],  # The raw string ID for retrieval
                 model.product_model(preprocess_product_features(x)[transformed_name("product_id")])
