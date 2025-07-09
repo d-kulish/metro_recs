@@ -214,52 +214,49 @@ def run_fn(fn_args: tfx.components.FnArgs):
         )
     )
 
-    # Define and save serving model
-    @tf.function(
-        input_signature=[
-            tf.TensorSpec(shape=[None], dtype=tf.string, name="examples")
-        ]
+    # Create a dedicated serving model that inherits from tf.Module. This ensures
+    # that all components needed for serving (the index, the TFT layer, etc.)
+    # are properly "tracked" by TensorFlow and can be saved correctly, resolving
+    # the "untracked" resource error.
+    class ServingModel(tf.Module):
+        def __init__(self, index, tft_layer, raw_feature_spec):
+            self.index = index
+            self.tft_layer = tft_layer
+            self.raw_feature_spec = raw_feature_spec
+
+        @tf.function(
+            input_signature=[
+                tf.TensorSpec(shape=[None], dtype=tf.string, name="examples")
+            ]
+        )
+        def __call__(self, serialized_tf_examples: tf.Tensor):
+            """The serving signature."""
+            serving_spec = self.raw_feature_spec.copy()
+
+            if "product_id" in serving_spec:
+                serving_spec["product_id"] = tf.io.FixedLenFeature(
+                    shape=[1], dtype=tf.int64, default_value=[0]
+                )
+            if "sell_val_nsp" in serving_spec:
+                serving_spec["sell_val_nsp"] = tf.io.FixedLenFeature(
+                    shape=[1], dtype=tf.float32, default_value=[0.0]
+                )
+
+            parsed_features = tf.io.parse_example(serialized_tf_examples, serving_spec)
+
+            if "sell_val_nsp" in parsed_features:
+                parsed_features["sell_val_nsp"] = tf.cast(
+                    parsed_features["sell_val_nsp"], dtype=tf.float64
+                )
+
+            transformed_features = self.tft_layer(parsed_features)
+            _, titles = self.index(transformed_features)
+            return {"product_id": titles}
+
+    serving_model = ServingModel(
+        index=index,
+        tft_layer=tft_layer,
+        raw_feature_spec=tf_transform_output.raw_feature_spec(),
     )
-    def serving_fn(serialized_tf_examples: tf.Tensor):
-        """Defines the serving signature for the model."""
-        # Get the original raw feature spec from the transform output.
-        raw_feature_spec = tf_transform_output.raw_feature_spec()
-        # Copy the spec to modify it for serving.
-        serving_spec = raw_feature_spec.copy()
 
-        # At serving time, the request will be missing features not relevant to the
-        # query, like `product_id` and the label `sell_val_nsp`. The `tft_layer`,
-        # however, expects all features from the training data. To fix this, we
-        # provide default values for the missing features in the parsing spec.
-        if "product_id" in serving_spec:
-            serving_spec["product_id"] = tf.io.FixedLenFeature(
-                shape=[1], dtype=tf.int64, default_value=[0]
-            )
-        if "sell_val_nsp" in serving_spec:
-            # The BQ query casts this to FLOAT64, but tf.io.parse_example's
-            # `default_value` does not support float64. We must use float32.
-            serving_spec["sell_val_nsp"] = tf.io.FixedLenFeature(
-                shape=[1], dtype=tf.float32, default_value=[0.0]
-            )
-
-        # Parse the incoming examples using the modified spec.
-        parsed_features = tf.io.parse_example(serialized_tf_examples, serving_spec)
-
-        # The `tft_layer` expects float64 for `sell_val_nsp` based on the
-        # original schema. We must cast the parsed float32 tensor back.
-        if "sell_val_nsp" in parsed_features:
-            parsed_features["sell_val_nsp"] = tf.cast(
-                parsed_features["sell_val_nsp"], dtype=tf.float64
-            )
-
-        # Apply the transformations.
-        transformed_features = tft_layer(parsed_features)
-
-        # The BruteForce layer was initialized with the user_model. We pass the
-        # dictionary of features directly to the index, and it will internally
-        # call the user_model to get the embeddings before finding candidates.
-        _, titles = index(transformed_features)
-        return {"product_id": titles}
-
-    signatures = {"serving_default": serving_fn}
-    tf.saved_model.save(index, fn_args.serving_model_dir, signatures=signatures)
+    tf.saved_model.save(serving_model, fn_args.serving_model_dir)
