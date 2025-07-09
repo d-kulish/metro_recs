@@ -29,7 +29,7 @@ def preprocessing_fn(inputs):
     # transformations that require dense inputs (like most string ops).
 
     # --- Categorical ID Features (originally INT64) ---
-    cust_person_id_dense = tft.sparse_tensor_to_dense(inputs["cust_person_id"], default_value=0)
+    cust_person_id_dense = tft.sparse_tensor_to_dense_with_shape(inputs["cust_person_id"], [None, 1], default_value=0)
     outputs[transformed_name("cust_person_id")] = tft.compute_and_apply_vocabulary(
         tf.strings.strip(tf.strings.as_string(cust_person_id_dense)),
         frequency_threshold=1,
@@ -37,7 +37,7 @@ def preprocessing_fn(inputs):
         vocab_filename="vocabulary_cust_person_id",
     )
 
-    product_id_dense = tft.sparse_tensor_to_dense(inputs["product_id"], default_value=0)
+    product_id_dense = tft.sparse_tensor_to_dense_with_shape(inputs["product_id"], [None, 1], default_value=0)
     outputs[transformed_name("product_id")] = tft.compute_and_apply_vocabulary(
         tf.strings.strip(tf.strings.as_string(product_id_dense)),
         frequency_threshold=1,
@@ -46,7 +46,7 @@ def preprocessing_fn(inputs):
     )
 
     # --- Categorical String Features ---
-    city_dense = tft.sparse_tensor_to_dense(inputs["city"], default_value="")
+    city_dense = tft.sparse_tensor_to_dense_with_shape(inputs["city"], [None, 1], default_value="")
     outputs[transformed_name("city")] = tft.compute_and_apply_vocabulary(
         tf.strings.strip(city_dense),
         frequency_threshold=1,
@@ -58,7 +58,7 @@ def preprocessing_fn(inputs):
     # Handle date feature by extracting cyclical components. This is robust
     # for future predictions as it captures seasonal patterns (e.g., month,
     # day) that are independent of the year.
-    date_str_dense = tft.sparse_tensor_to_dense(inputs["date_of_day"], default_value="")
+    date_str_dense = tft.sparse_tensor_to_dense_with_shape(inputs["date_of_day"], [None, 1], default_value="")
     date_str = tf.strings.strip(date_str_dense)
 
     # Extract month as a categorical feature (e.g., '06' from '2025-06-15').
