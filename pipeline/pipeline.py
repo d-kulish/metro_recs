@@ -16,6 +16,7 @@ def create_pipeline(
     query: str,
     project_id: str,
     region: str,
+    service_account: str,
     enable_cache: bool = True,
     metadata_connection_config: Optional[metadata_store_pb2.ConnectionConfig] = None,
 ) -> pipeline.Pipeline:
@@ -27,6 +28,7 @@ def create_pipeline(
         query: BigQuery SQL query
         project_id: GCP project ID
         region: GCP region
+        service_account: Service account email for Dataflow workers
         enable_cache: Whether to enable caching
         metadata_connection_config: Metadata connection config
 
@@ -92,6 +94,7 @@ def create_pipeline(
                     "--runner=DataflowRunner",
                     f"--temp_location={pipeline_root}/temp",
                     f"--staging_location={pipeline_root}/staging",
+                    f"--service_account_email={service_account}",
                 ]
             )
 

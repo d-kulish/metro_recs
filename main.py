@@ -56,6 +56,7 @@ def run_pipeline():
                 query=config.BQ_QUERY,
                 project_id=config.PROJECT_ID,
                 region=config.VERTEX_REGION,
+                service_account=config.VERTEX_SERVICE_ACCOUNT,
                 metadata_connection_config=metadata_config,
             )
 
@@ -105,13 +106,8 @@ def run_pipeline():
                     logging.debug(f"Could not get dashboard URI: {e}")
 
             except Exception as e:
-                logging.error(f"Failed to submit pipeline: {e}")
-                logging.error("This might be a permissions issue. Please check:")
-                logging.error("1. Vertex AI API is enabled")
-                logging.error("2. Your service account has 'Vertex AI User' role")
-                logging.error("3. Your service account has 'Service Account User' role")
-                logging.error("4. BigQuery permissions for the dataset")
-                raise
+                logging.error(f"Failed to submit pipeline: {e}", exc_info=True)
+                raise e
 
     else:
         from tfx.orchestration.local.local_dag_runner import LocalDagRunner
@@ -124,6 +120,7 @@ def run_pipeline():
             query=config.BQ_QUERY,
             project_id=config.PROJECT_ID,
             region=config.VERTEX_REGION,
+            service_account=config.VERTEX_SERVICE_ACCOUNT,
             metadata_connection_config=None,
         )
 
