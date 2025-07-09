@@ -84,7 +84,8 @@ WITH
 UserHistoricalRevenue AS (
   SELECT
     cust_person_id,
-    SUM(sell_val_nsp) AS total_revenue
+    -- Cast the summed revenue to FLOAT64 to avoid NUMERIC type errors in TFX.
+    CAST(SUM(sell_val_nsp) AS FLOAT64) AS total_revenue
   FROM `{PROJECT_ID}.{DATASET_ID}.ml_bi_invoices_tbl`
   WHERE month_id = {HISTORICAL_MONTH_ID}
   GROUP BY cust_person_id
