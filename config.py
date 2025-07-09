@@ -114,8 +114,11 @@ PIPELINE_ROOT = "gs://recs_metroua/pipeline_root"
 # for the 'europe-west4' region.
 DATAFLOW_SUBNETWORK = "regions/europe-west4/subnetworks/default"
 
-# Use a public TFX image instead of building your own
-PIPELINE_IMAGE = "gcr.io/tfx-oss-public/tfx:1.15.0"
+# Use a custom Docker image that includes tensorflow-recommenders.
+# You must build and push this image to your project's Artifact Registry.
+AR_REPO = "metro-recs-repo"  # The name of your Artifact Registry repository
+IMAGE_NAME = "metro-recs-pipeline"
+PIPELINE_IMAGE = f"{VERTEX_REGION}-docker.pkg.dev/{VERTEX_PROJECT_ID}/{AR_REPO}/{IMAGE_NAME}:latest"
 
 # Service account settings - use the Vertex AI service account or the current compute account
 # Option 1: Use the default Vertex AI service account (if it exists)

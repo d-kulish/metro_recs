@@ -1,0 +1,4 @@
+# This file lists only the additional Python packages needed on top of the base TFX image.
+tensorflow-recommenders==0.7.3
+# Add bigquery client to ensure it's available for fetching candidates in the trainer.
+google-cloud-bigquery==3.11.4
