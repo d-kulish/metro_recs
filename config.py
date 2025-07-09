@@ -22,7 +22,8 @@ AllInteractions AS (
     -- Format DATE as STRING because BigQueryExampleGen doesn't support the DATE type.
     FORMAT_DATE('%Y-%m-%d', invoices.date_of_day) AS date_of_day,
     (invoices.art_no * 1000000 + invoices.var_tu_key) AS product_id,
-    invoices.sell_val_nsp,
+    -- Cast NUMERIC to FLOAT64 as BigQueryExampleGen doesn't support NUMERIC.
+    CAST(invoices.sell_val_nsp AS FLOAT64) AS sell_val_nsp,
     stores.city
   FROM
     `{PROJECT_ID}.{DATASET_ID}.ml_bi_invoices_tbl` AS invoices
