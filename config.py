@@ -16,7 +16,8 @@ WITH UserHistoricalRevenue AS (
 AllInteractions AS (
   SELECT
     invoices.cust_person_id,
-    invoices.date_of_day,
+    -- Cast DATE to STRING as BigQueryExampleGen doesn't support the DATE type.
+    CAST(invoices.date_of_day AS STRING) AS date_of_day,
     (invoices.art_no * 1000000 + invoices.var_tu_key) AS product_id,
     invoices.sell_val_nsp,
     stores.city
