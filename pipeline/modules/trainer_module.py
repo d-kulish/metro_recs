@@ -236,13 +236,21 @@ def run_fn(fn_args: tfx.components.FnArgs):
                 shape=[1], dtype=tf.int64, default_value=[0]
             )
         if "sell_val_nsp" in serving_spec:
-            # The BQ query casts this to FLOAT64.
+            # The BQ query casts this to FLOAT64, but tf.io.parse_example's
+            # `default_value` does not support float64. We must use float32.
             serving_spec["sell_val_nsp"] = tf.io.FixedLenFeature(
-                shape=[1], dtype=tf.float64, default_value=[0.0]
+                shape=[1], dtype=tf.float32, default_value=[0.0]
             )
 
         # Parse the incoming examples using the modified spec.
         parsed_features = tf.io.parse_example(serialized_tf_examples, serving_spec)
+
+        # The `tft_layer` expects float64 for `sell_val_nsp` based on the
+        # original schema. We must cast the parsed float32 tensor back.
+        if "sell_val_nsp" in parsed_features:
+            parsed_features["sell_val_nsp"] = tf.cast(
+                parsed_features["sell_val_nsp"], dtype=tf.float64
+            )
 
         # Apply the transformations.
         transformed_features = tft_layer(parsed_features)
