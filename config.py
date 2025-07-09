@@ -4,42 +4,53 @@
 PROJECT_ID = "cf-mccuagcf-recommenders-ht"
 LOCATION = "EU"
 DATASET_ID = "segmentation"
-BQ_QUERY = """
-WITH UserHistoricalRevenue AS (
-  SELECT
-    cust_person_id,
-    SUM(sell_val_nsp) AS total_revenue
-  FROM `cf-mccuagcf-recommenders-ht.segmentation.ml_bi_invoices_tbl`
-  WHERE month_id = 202505 -- The month *before* the training data
-  GROUP BY cust_person_id
-),
+
+# --- Query Parameters ---
+TRAINING_MONTH_ID = 202506
+HISTORICAL_MONTH_ID = 202505
+TARGET_CITY = "TERNOPIL"
+TOP_PRODUCTS_PERCENTAGE = 0.8
+
+# --- Reusable Query Fragments ---
+
+# This CTE gets all relevant interactions for the training month and city.
+# It also handles the casting of unsupported data types.
+ALL_INTERACTIONS_CTE = f"""
 AllInteractions AS (
   SELECT
     invoices.cust_person_id,
-    -- Cast DATE to STRING as BigQueryExampleGen doesn't support the DATE type.
-    CAST(invoices.date_of_day AS STRING) AS date_of_day,
+    -- Format DATE as STRING because BigQueryExampleGen doesn't support the DATE type.
+    FORMAT_DATE('%Y-%m-%d', invoices.date_of_day) AS date_of_day,
     (invoices.art_no * 1000000 + invoices.var_tu_key) AS product_id,
     invoices.sell_val_nsp,
     stores.city
   FROM
-    `cf-mccuagcf-recommenders-ht.segmentation.ml_bi_invoices_tbl` AS invoices
+    `{PROJECT_ID}.{DATASET_ID}.ml_bi_invoices_tbl` AS invoices
   LEFT JOIN
-    `cf-mccuagcf-recommenders-ht.segmentation.ml_bi_stores_tbl` AS stores
+    `{PROJECT_ID}.{DATASET_ID}.ml_bi_stores_tbl` AS stores
   ON
     invoices.store_id = stores.store_id
   WHERE
-    invoices.month_id = 202506
+    invoices.month_id = {TRAINING_MONTH_ID}
     AND invoices.flag_cust_target_group = "SCO"
     AND sell_val_nsp > 0
-    AND city = "TERNOPIL"
-),
+    AND city = "{TARGET_CITY}"
+)
+"""
+
+# This CTE calculates revenue per product from the interactions.
+PRODUCT_REVENUES_CTE = """
 ProductRevenues AS (
   SELECT
     product_id,
     SUM(sell_val_nsp) AS revenue
   FROM AllInteractions
   GROUP BY product_id
-),
+)
+"""
+
+# This CTE selects the top N% of products by revenue.
+TOP_PRODUCTS_CTE = f"""
 TopProducts AS (
   SELECT
     product_id
@@ -47,11 +58,39 @@ TopProducts AS (
     SELECT
       product_id,
       revenue,
-      SUM(revenue) OVER (ORDER BY revenue DESC) AS cumulative_revenue
+      SUM(revenue) OVER (ORDER BY revenue DESC) AS cumulative_revenue,
+      (SELECT SUM(revenue) FROM ProductRevenues) AS total_revenue
     FROM ProductRevenues
   )
-  WHERE cumulative_revenue - revenue < 0.8 * (SELECT SUM(revenue) FROM ProductRevenues)
+  WHERE cumulative_revenue - revenue < {TOP_PRODUCTS_PERCENTAGE} * total_revenue
 )
+"""
+
+# --- Final Queries ---
+
+# This query is used by the Trainer to get the list of all candidate products.
+BQ_PRODUCTS_QUERY = f"""
+WITH
+{ALL_INTERACTIONS_CTE},
+{PRODUCT_REVENUES_CTE},
+{TOP_PRODUCTS_CTE}
+SELECT product_id FROM TopProducts
+"""
+
+# This query is used by ExampleGen to get the training data.
+BQ_QUERY = f"""
+WITH
+UserHistoricalRevenue AS (
+  SELECT
+    cust_person_id,
+    SUM(sell_val_nsp) AS total_revenue
+  FROM `{PROJECT_ID}.{DATASET_ID}.ml_bi_invoices_tbl`
+  WHERE month_id = {HISTORICAL_MONTH_ID}
+  GROUP BY cust_person_id
+),
+{ALL_INTERACTIONS_CTE},
+{PRODUCT_REVENUES_CTE},
+{TOP_PRODUCTS_CTE}
 SELECT
   interactions.*,
   -- Use COALESCE to handle users who have no history, assigning them 0 revenue.
@@ -62,36 +101,6 @@ LEFT JOIN UserHistoricalRevenue AS hist ON interactions.cust_person_id = hist.cu
 JOIN TopProducts ON interactions.product_id = TopProducts.product_id
 """
 
-BQ_PRODUCTS_QUERY = """
-WITH ProductRevenues AS (
-  SELECT
-    (invoices.art_no * 1000000 + invoices.var_tu_key) AS product_id,
-    SUM(invoices.sell_val_nsp) AS revenue
-  FROM
-    `cf-mccuagcf-recommenders-ht.segmentation.ml_bi_invoices_tbl` AS invoices
-  LEFT JOIN
-    `cf-mccuagcf-recommenders-ht.segmentation.ml_bi_stores_tbl` AS stores
-  ON
-    invoices.store_id = stores.store_id
-  WHERE
-    invoices.month_id = 202506
-    AND invoices.flag_cust_target_group = "SCO"
-    AND invoices.sell_val_nsp > 0
-    AND stores.city = "TERNOPIL"
-  GROUP BY
-    product_id
-)
-SELECT
-  product_id
-FROM (
-  SELECT
-    product_id,
-    revenue,
-    SUM(revenue) OVER (ORDER BY revenue DESC) AS cumulative_revenue
-  FROM ProductRevenues
-)
-WHERE cumulative_revenue - revenue < 0.8 * (SELECT SUM(revenue) FROM ProductRevenues)
-"""
 # Vertex AI settings
 VERTEX_PROJECT_ID = PROJECT_ID
 VERTEX_REGION = "europe-west4"
