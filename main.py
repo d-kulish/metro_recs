@@ -55,7 +55,7 @@ def run_pipeline():
                 pipeline_root=config.PIPELINE_ROOT,
                 query=config.BQ_QUERY,
                 project_id=config.PROJECT_ID,
-                region=config.LOCATION,
+                region=config.VERTEX_REGION,
                 metadata_connection_config=metadata_config,
             )
 
@@ -123,7 +123,7 @@ def run_pipeline():
             pipeline_root=config.PIPELINE_ROOT,
             query=config.BQ_QUERY,
             project_id=config.PROJECT_ID,
-            region=config.LOCATION,
+            region=config.VERTEX_REGION,
             metadata_connection_config=None,
         )
 
@@ -140,7 +140,5 @@ def main(_):
     run_pipeline()
 
 
-if __name__ == "__main__":
-    app.run(main)
 if __name__ == "__main__":
     app.run(main)
