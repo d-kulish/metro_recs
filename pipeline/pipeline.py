@@ -50,7 +50,7 @@ def create_pipeline(
 
     # Generate schema
     schema_gen = tfx.components.SchemaGen(
-        statistics=statistics_gen.outputs["statistics"], infer_feature_shape=False
+        statistics=statistics_gen.outputs["statistics"], infer_feature_shape=True
     )
 
     # Data transformation

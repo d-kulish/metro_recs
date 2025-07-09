@@ -39,8 +39,15 @@ class MetroRecommendationModel(tfrs.Model):
         self, features: Dict[Text, tf.Tensor], training=False
     ) -> tf.Tensor:
         """Compute loss for training."""
-        # The user model now expects a dictionary of features.
-        user_embeddings = self.user_model(features)
+        # Create a dictionary of only the features needed by the user model
+        # to avoid passing unnecessary data like the product_id.
+        user_features = {
+            key: value
+            for key, value in features.items()
+            if key != transformed_name("product_id")
+        }
+
+        user_embeddings = self.user_model(user_features)
         positive_product_embeddings = self.product_model(
             features[transformed_name("product_id")]
         )
@@ -90,9 +97,11 @@ def _build_user_model(
         (transformed_name("day_of_month"), "vocabulary_day_of_month", None),
         (transformed_name("total_revenue_bucket"), None, 100),
     ]:
-        vocab_size = (num_buckets + 1) if num_buckets else tf_transform_output.vocabulary_size_by_name(vocab_name)
+        # The input_dim must be vocab_size + num_oov_buckets. In our transform, num_oov_buckets is 1.
+        # This fixes the "index out of bounds" error.
+        vocab_size = (num_buckets + 1) if num_buckets else (tf_transform_output.vocabulary_size_by_name(vocab_name) + 1)
         embedding_layer = tf.keras.layers.Embedding(
-            input_dim=vocab_size, output_dim=EMBEDDING_DIMENSION
+            input_dim=vocab_size, output_dim=EMBEDDING_DIMENSION, name=f"embedding_{key}"
         )
         embeddings.append(tf.keras.layers.Flatten()(embedding_layer(inputs[key])))
 
@@ -112,12 +121,13 @@ def _build_product_model(
     tf_transform_output: tft.TFTransformOutput,
 ) -> tf.keras.Model:
     """Builds the product model tower."""
-    vocab_size = tf_transform_output.vocabulary_size_by_name("vocabulary_product_id")
+    # The input_dim must be vocab_size + num_oov_buckets. In our transform, num_oov_buckets is 1.
+    vocab_size = tf_transform_output.vocabulary_size_by_name("vocabulary_product_id") + 1
     product_id_input = tf.keras.Input(
         shape=(1,), name=transformed_name("product_id"), dtype=tf.int64
     )
     embedding = tf.keras.layers.Embedding(
-        input_dim=vocab_size, output_dim=EMBEDDING_DIMENSION
+        input_dim=vocab_size, output_dim=EMBEDDING_DIMENSION, name="embedding_product_id"
     )(product_id_input)
     return tf.keras.Model(inputs=product_id_input, outputs=tf.keras.layers.Flatten()(embedding))
 
