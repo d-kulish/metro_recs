@@ -98,6 +98,9 @@ def create_pipeline(
                     f"--staging_location={pipeline_root}/staging",
                     f"--service_account_email={service_account}",
                     f"--subnetwork={subnetwork}",
+                    # Prevent Dataflow workers from using public IPs. This is a common requirement
+                    # in secure VPC environments and relies on Private Google Access being enabled.
+                    "--no_use_public_ips",
                 ]
             )
 

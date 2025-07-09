@@ -87,26 +87,17 @@ def run_pipeline():
                 location=config.VERTEX_REGION,
                 enable_caching=True,
             )
-
-            logging.info(f"Submitting pipeline job: {config.PIPELINE_NAME}")
-
             try:
-                job.submit()
+                logging.info(f"Submitting pipeline job: {config.PIPELINE_NAME}")
+                # Pass the service account to ensure the pipeline runs with the correct permissions.
+                job.submit(service_account=config.VERTEX_SERVICE_ACCOUNT)
                 logging.info(
                     f"Pipeline submitted successfully. Job name: {job.resource_name}"
                 )
-
-                # Try to get the dashboard URI, but handle the case where it might not be available
-                try:
-                    dashboard_uri = job._dashboard_uri()
-                    logging.info(f"You can view the pipeline at: {dashboard_uri}")
-                except Exception as e:
-                    logging.info(
-                        f"Pipeline submitted. Check Vertex AI Pipelines console for status."
-                    )
-                    logging.debug(f"Could not get dashboard URI: {e}")
-
+                # The dashboard URI is available after the job object is created/submitted.
+                logging.info(f"You can view the pipeline at: {job._dashboard_uri()}")
             except Exception as e:
+                # Provide more detailed error logging.
                 logging.error(f"Failed to submit pipeline: {e}", exc_info=True)
                 raise e
 
