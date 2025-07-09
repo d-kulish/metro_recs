@@ -83,8 +83,6 @@ def run_pipeline():
                 pipeline_root=config.PIPELINE_ROOT,
                 project=config.VERTEX_PROJECT_ID,
                 location=config.VERTEX_REGION,
-                # Explicitly specify the service account to avoid the default compute account issue
-                service_account=config.VERTEX_SERVICE_ACCOUNT,
                 enable_caching=True,
             )
 
@@ -142,5 +140,7 @@ def main(_):
     run_pipeline()
 
 
+if __name__ == "__main__":
+    app.run(main)
 if __name__ == "__main__":
     app.run(main)
