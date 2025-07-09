@@ -28,38 +28,34 @@ def preprocessing_fn(inputs):
     # missing values. We must convert them to dense tensors before applying
     # transformations that require dense inputs (like most string ops).
 
-    # --- Categorical ID Features (originally INT64) ---
-    cust_person_id_dense = tft.sparse_tensor_to_dense_with_shape(inputs["cust_person_id"], [None, 1], default_value=0)
+    # With `infer_feature_shape=True` in SchemaGen, TFX provides these features as dense tensors.
+    # We no longer need to convert them from sparse tensors.
+
+    # --- Categorical ID Features (originally INT64, now dense) ---
     outputs[transformed_name("cust_person_id")] = tft.compute_and_apply_vocabulary(
-        tf.strings.strip(tf.strings.as_string(cust_person_id_dense)),
+        tf.strings.strip(tf.strings.as_string(inputs["cust_person_id"])),
         frequency_threshold=1,
         num_oov_buckets=1,
         vocab_filename="vocabulary_cust_person_id",
     )
 
-    product_id_dense = tft.sparse_tensor_to_dense_with_shape(inputs["product_id"], [None, 1], default_value=0)
     outputs[transformed_name("product_id")] = tft.compute_and_apply_vocabulary(
-        tf.strings.strip(tf.strings.as_string(product_id_dense)),
+        tf.strings.strip(tf.strings.as_string(inputs["product_id"])),
         frequency_threshold=1,
         num_oov_buckets=1,
         vocab_filename="vocabulary_product_id",
     )
 
-    # --- Categorical String Features ---
-    city_dense = tft.sparse_tensor_to_dense_with_shape(inputs["city"], [None, 1], default_value="")
+    # --- Categorical String Features (already dense) ---
     outputs[transformed_name("city")] = tft.compute_and_apply_vocabulary(
-        tf.strings.strip(city_dense),
+        tf.strings.strip(inputs["city"]),
         frequency_threshold=1,
         num_oov_buckets=1,
         vocab_filename="vocabulary_city",
     )
 
-    # --- Date Feature ---
-    # Handle date feature by extracting cyclical components. This is robust
-    # for future predictions as it captures seasonal patterns (e.g., month,
-    # day) that are independent of the year.
-    date_str_dense = tft.sparse_tensor_to_dense_with_shape(inputs["date_of_day"], [None, 1], default_value="")
-    date_str = tf.strings.strip(date_str_dense)
+    # --- Date Feature (already dense) ---
+    date_str = tf.strings.strip(inputs["date_of_day"])
 
     # Extract month as a categorical feature (e.g., '06' from '2025-06-15').
     month_str = tf.strings.substr(date_str, 5, 2)
