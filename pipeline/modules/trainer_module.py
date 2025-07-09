@@ -31,9 +31,9 @@ class MetroRecommendationModel(tfrs.Model):
         self.product_model = product_model
         self.user_model = user_model
 
-        self.task = tfrs.tasks.Retrieval(
-            metrics=tfrs.metrics.FactorizedTopK()
-        )
+        # Initialize the task without metrics. They will be attached later in the
+        # run_fn after the candidate dataset has been created.
+        self.task = tfrs.tasks.Retrieval()
 
     def compute_loss(
         self, features: Dict[Text, tf.Tensor], training=False
