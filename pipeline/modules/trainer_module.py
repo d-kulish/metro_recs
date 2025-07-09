@@ -141,7 +141,7 @@ def run_fn(fn_args: tfx.components.FnArgs):
         log_dir=fn_args.model_run_dir, update_freq="batch"
     )
 
-    # Set up the candidate dataset for metrics by querying BigQuery directly.
+    # --- Candidate set creation for evaluation ---
     logging.info("Querying BigQuery for candidate products...")
     project_id = fn_args.custom_config["project_id"]
     products_query = fn_args.custom_config["products_query"]
@@ -149,14 +149,30 @@ def run_fn(fn_args: tfx.components.FnArgs):
     products_df = client.query(products_query).to_dataframe()
     logging.info(f"Found {len(products_df)} candidate products.")
 
-    # Create a tf.data.Dataset from the product IDs.
+    # Create a tf.data.Dataset of raw product IDs.
     products_ds = tf.data.Dataset.from_tensor_slices(
         products_df["product_id"].astype(str)
     )
 
-    # Create a dataset of dictionaries for the TFT layer and map to embeddings.
+    # Create a dataset of dictionaries for preprocessing.
     products_dict_ds = products_ds.map(lambda x: {"product_id": x})
-    candidates = products_dict_ds.batch(4096).map(tft_layer).map(
+
+    # Create a dedicated preprocessing layer for product IDs. This is crucial
+    # because the main `tft_layer` expects all features, but here we only have
+    # the product_id. We use the vocabulary computed by the Transform component.
+    product_vocab = tf_transform_output.vocabulary_by_name("vocabulary_product_id")
+    product_lookup_layer = tf.keras.layers.StringLookup(
+        vocabulary=product_vocab, num_oov_indices=1
+    )
+
+    def preprocess_product_features(features):
+        """Applies the product_id transformation."""
+        # The input `features` is a dictionary like {"product_id": "some_id_string"}
+        transformed_id = product_lookup_layer(features["product_id"])
+        return {transformed_name("product_id"): transformed_id}
+
+    # Map the raw product IDs to their embeddings to create the candidate set for metrics.
+    candidates = products_dict_ds.batch(4096).map(preprocess_product_features).map(
         lambda x: model.product_model(x[transformed_name("product_id")])
     )
 
@@ -176,8 +192,8 @@ def run_fn(fn_args: tfx.components.FnArgs):
     index.index_from_dataset(
         dataset=products_dict_ds.batch(4096).map(
             lambda x: (
-                x["product_id"],
-                model.product_model(tft_layer(x)[transformed_name("product_id")])
+                x["product_id"],  # The raw string ID for retrieval
+                model.product_model(preprocess_product_features(x)[transformed_name("product_id")])
             )
         )
     )
