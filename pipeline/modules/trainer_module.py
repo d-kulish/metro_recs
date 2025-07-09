@@ -215,28 +215,42 @@ def run_fn(fn_args: tfx.components.FnArgs):
     )
 
     # Define and save serving model
-    @tf.function
-    def serving_fn(serialized_tf_examples):
+    @tf.function(
+        input_signature=[
+            tf.TensorSpec(shape=[None], dtype=tf.string, name="examples")
+        ]
+    )
+    def serving_fn(serialized_tf_examples: tf.Tensor):
+        """Defines the serving signature for the model."""
+        # Get the original raw feature spec from the transform output.
         raw_feature_spec = tf_transform_output.raw_feature_spec()
-        serving_feature_spec = {
-            # We need all raw features that are inputs to the user model's
-            # branch of the transform graph.
-            "cust_person_id": raw_feature_spec["cust_person_id"],
-            "city": raw_feature_spec["city"],
-            "date_of_day": raw_feature_spec["date_of_day"],
-            "total_revenue": raw_feature_spec["total_revenue"],
-        }
-        parsed_features = tf.io.parse_example(
-            serialized_tf_examples, serving_feature_spec
-        )
+        # Copy the spec to modify it for serving.
+        serving_spec = raw_feature_spec.copy()
+
+        # At serving time, the request will be missing features not relevant to the
+        # query, like `product_id` and the label `sell_val_nsp`. The `tft_layer`,
+        # however, expects all features from the training data. To fix this, we
+        # provide default values for the missing features in the parsing spec.
+        if "product_id" in serving_spec:
+            serving_spec["product_id"] = tf.io.FixedLenFeature(
+                shape=[1], dtype=tf.int64, default_value=[0]
+            )
+        if "sell_val_nsp" in serving_spec:
+            # The BQ query casts this to FLOAT64.
+            serving_spec["sell_val_nsp"] = tf.io.FixedLenFeature(
+                shape=[1], dtype=tf.float64, default_value=[0.0]
+            )
+
+        # Parse the incoming examples using the modified spec.
+        parsed_features = tf.io.parse_example(serialized_tf_examples, serving_spec)
+
+        # Apply the transformations.
         transformed_features = tft_layer(parsed_features)
+
         # The user model expects a dictionary of transformed features.
         user_embeddings = index._query_model(transformed_features)
         _, titles = index(user_embeddings)
         return {"product_id": titles}
 
-    concrete_serving_fn = serving_fn.get_concrete_function(
-        tf.TensorSpec(shape=[None], dtype=tf.string, name="examples")
-    )
-    signatures = {"serving_default": concrete_serving_fn}
+    signatures = {"serving_default": serving_fn}
     tf.saved_model.save(index, fn_args.serving_model_dir, signatures=signatures)
