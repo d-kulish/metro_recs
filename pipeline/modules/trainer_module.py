@@ -255,9 +255,10 @@ def run_fn(fn_args: tfx.components.FnArgs):
         # Apply the transformations.
         transformed_features = tft_layer(parsed_features)
 
-        # The user model expects a dictionary of transformed features.
-        user_embeddings = index.query_model(transformed_features)
-        _, titles = index(user_embeddings)
+        # The BruteForce layer was initialized with the user_model. We pass the
+        # dictionary of features directly to the index, and it will internally
+        # call the user_model to get the embeddings before finding candidates.
+        _, titles = index(transformed_features)
         return {"product_id": titles}
 
     signatures = {"serving_default": serving_fn}
