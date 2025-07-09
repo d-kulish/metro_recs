@@ -12,7 +12,13 @@ from tfx_bsl.public import tfxio
 # We will query for candidate data directly in the trainer.
 from google.cloud import bigquery
 
-from pipeline.modules.transform_module import transformed_name, LABEL_KEY
+# Define constants and helpers directly in this module to avoid
+# problematic cross-module imports in the TFX execution environment.
+LABEL_KEY = "sell_val_nsp"
+
+def transformed_name(key):
+    """Generate transformed feature name."""
+    return key + "_xf"
 
 EMBEDDING_DIMENSION = 32
 
