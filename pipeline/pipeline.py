@@ -17,6 +17,7 @@ def create_pipeline(
     project_id: str,
     region: str,
     service_account: str,
+    subnetwork: str,
     enable_cache: bool = True,
     metadata_connection_config: Optional[metadata_store_pb2.ConnectionConfig] = None,
 ) -> pipeline.Pipeline:
@@ -29,6 +30,7 @@ def create_pipeline(
         project_id: GCP project ID
         region: GCP region
         service_account: Service account email for Dataflow workers
+        subnetwork: Dataflow subnetwork
         enable_cache: Whether to enable caching
         metadata_connection_config: Metadata connection config
 
@@ -95,6 +97,7 @@ def create_pipeline(
                     f"--temp_location={pipeline_root}/temp",
                     f"--staging_location={pipeline_root}/staging",
                     f"--service_account_email={service_account}",
+                    f"--subnetwork={subnetwork}",
                 ]
             )
 

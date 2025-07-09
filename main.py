@@ -57,6 +57,7 @@ def run_pipeline():
                 project_id=config.PROJECT_ID,
                 region=config.VERTEX_REGION,
                 service_account=config.VERTEX_SERVICE_ACCOUNT,
+                subnetwork=config.DATAFLOW_SUBNETWORK,
                 metadata_connection_config=metadata_config,
             )
 
@@ -121,6 +122,7 @@ def run_pipeline():
             project_id=config.PROJECT_ID,
             region=config.VERTEX_REGION,
             service_account=config.VERTEX_SERVICE_ACCOUNT,
+            subnetwork=config.DATAFLOW_SUBNETWORK,
             metadata_connection_config=None,
         )
 

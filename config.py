@@ -97,6 +97,11 @@ VERTEX_REGION = "europe-west4"
 PIPELINE_NAME = "metro-recommendations-pipeline"
 PIPELINE_ROOT = "gs://recs_metroua/pipeline_root"
 
+# Dataflow settings for custom VPC. This is required if your project's network
+# is in custom subnet mode. Ask your GCP admin for the correct subnetwork name
+# for the 'europe-west4' region.
+DATAFLOW_SUBNETWORK = "regions/europe-west4/subnetworks/default"
+
 # Use a public TFX image instead of building your own
 PIPELINE_IMAGE = "gcr.io/tfx-oss-public/tfx:1.15.0"
 
