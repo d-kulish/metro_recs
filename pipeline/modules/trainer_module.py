@@ -256,7 +256,7 @@ def run_fn(fn_args: tfx.components.FnArgs):
         transformed_features = tft_layer(parsed_features)
 
         # The user model expects a dictionary of transformed features.
-        user_embeddings = index._query_model(transformed_features)
+        user_embeddings = index.query_model(transformed_features)
         _, titles = index(user_embeddings)
         return {"product_id": titles}
 
