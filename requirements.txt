@@ -1,6 +1,6 @@
 # Core TFX and TensorFlow
 tfx==1.15.0
-tensorflow==2.15.0
+tensorflow==2.15.1
 tensorflow-recommenders==0.7.3
 
 # Google Cloud dependencies with compatible versions

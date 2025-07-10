@@ -5,7 +5,7 @@ FROM python:3.10-slim
 # The standard 'tensorflow' package now includes GPU support and will work on
 # Vertex AI GPU nodes.
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir tensorflow==2.15.0 tfx==1.15.0
+    pip install --no-cache-dir tensorflow==2.15.1 tfx==1.15.0
 
 # Copy the requirements file that specifies our additional libraries.
 COPY docker_requirements.txt .
