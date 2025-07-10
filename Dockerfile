@@ -1,10 +1,11 @@
-# Use the official TensorFlow 2.15.0 GPU image as a base. This is the version
-# compatible with TFX 1.15.0 and ensures CUDA drivers are available.
-FROM tensorflow/tensorflow:2.15.0-gpu
+# Use an official Python 3.10 image. TFX 1.15.0 requires Python >=3.9 and <3.11.
+FROM python:3.10-slim
 
-# Install the TFX library itself. This will pull in all required dependencies
-# like Apache Beam and MLMD.
-RUN pip install --no-cache-dir tfx==1.15.0
+# Upgrade pip and install TensorFlow and TFX in a single layer.
+# The standard 'tensorflow' package now includes GPU support and will work on
+# Vertex AI GPU nodes.
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir tensorflow==2.15.0 tfx==1.15.0
 
 # Copy the requirements file that specifies our additional libraries.
 COPY docker_requirements.txt .
