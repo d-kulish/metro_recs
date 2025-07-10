@@ -1,6 +1,10 @@
-# Use the official TFX image as the base. This ensures all core TFX
-# and TensorFlow dependencies are correctly installed.
-FROM gcr.io/tfx-oss-public/tfx:1.15.0-gpu
+# Use the official TensorFlow 2.15.0 GPU image as a base. This is the version
+# compatible with TFX 1.15.0 and ensures CUDA drivers are available.
+FROM tensorflow/tensorflow:2.15.0-gpu
+
+# Install the TFX library itself. This will pull in all required dependencies
+# like Apache Beam and MLMD.
+RUN pip install --no-cache-dir tfx==1.15.0
 
 # Copy the requirements file that specifies our additional libraries.
 COPY docker_requirements.txt .
