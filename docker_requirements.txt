@@ -1,4 +1,7 @@
-# This file lists only the additional Python packages needed on top of the base TFX image.
+# This file lists all Python packages for the custom pipeline container.
+tensorflow==2.15.1
 tensorflow-recommenders==0.7.3
 # Add bigquery client to ensure it's available for fetching candidates in the trainer.
 google-cloud-bigquery==3.11.4
+tfx==1.15.0
+apache-beam[gcp]==2.53.0
