@@ -13,8 +13,3 @@ steps:
 # This section tells Cloud Build to push the successfully built image to Artifact Registry.
 images:
   - 'europe-west4-docker.pkg.dev/cf-mccuagcf-recommenders-ht/metro-recs-repo/metro-recs-pipeline:latest-gpu'
-
-# This section sets build-wide options.
-options:
-  # Specify a regional GCS bucket for staging source to comply with location policies.
-  gcs_source_staging_dir: 'gs://recs_metroua_cloudbuild/source'
