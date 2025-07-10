@@ -61,18 +61,39 @@ def create_pipeline(
     )
 
     # Model training
-    trainer = tfx.components.Trainer(
+    # To run on GPUs, we use the specialized Trainer for Vertex AI, which allows
+    # us to specify machine types and accelerators.
+    trainer = tfx.extensions.google_cloud_ai_platform.Trainer(
         module_file=os.path.abspath("pipeline/modules/trainer_module.py"),
         examples=transform.outputs["transformed_examples"],
         transform_graph=transform.outputs["transform_graph"],
         schema=transform.outputs["post_transform_schema"],
         train_args=tfx.proto.TrainArgs(num_steps=config.TRAIN_STEPS),
         eval_args=tfx.proto.EvalArgs(num_steps=config.EVAL_STEPS),
+        # The custom_config is used to pass parameters to the trainer module
+        # and to configure the Vertex AI Training job.
         custom_config={
+            # Parameters for the trainer module
             "epochs": config.TRAIN_EPOCHS,
-            "project_id": config.PROJECT_ID,
+            "project_id": project_id,
             "products_query": config.BQ_PRODUCTS_QUERY,
-        },
+            # Configuration for the Vertex AI Training job
+            "ai_platform_training_args": {
+                "project": project_id,
+                "region": region,
+                "worker_pool_specs": [{
+                    "machine_spec": {
+                        "machine_type": "n1-standard-4",
+                        "accelerator_type": "NVIDIA_TESLA_T4",
+                        "accelerator_count": 1,
+                    },
+                    "replica_count": 1,
+                    "container_spec": {
+                        "image_uri": config.PIPELINE_IMAGE,
+                    },
+                }],
+            },
+        }
     )
 
     # Set container image for all components when running on Vertex AI

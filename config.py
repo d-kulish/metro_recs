@@ -106,7 +106,7 @@ JOIN TopProducts ON interactions.product_id = TopProducts.product_id
 # Vertex AI settings
 VERTEX_PROJECT_ID = PROJECT_ID
 VERTEX_REGION = "europe-west4"
-PIPELINE_NAME = "metro-recommendations-pipeline"
+PIPELINE_NAME = "metro-recommendations-pipeline-gpu"
 PIPELINE_ROOT = "gs://recs_metroua/pipeline_root"
 
 # Dataflow settings for custom VPC. This is required if your project's network
@@ -118,7 +118,7 @@ DATAFLOW_SUBNETWORK = "regions/europe-west4/subnetworks/default"
 # You must build and push this image to your project's Artifact Registry.
 AR_REPO = "metro-recs-repo"  # The name of your Artifact Registry repository
 IMAGE_NAME = "metro-recs-pipeline"
-PIPELINE_IMAGE = f"{VERTEX_REGION}-docker.pkg.dev/{VERTEX_PROJECT_ID}/{AR_REPO}/{IMAGE_NAME}:latest"
+PIPELINE_IMAGE = f"{VERTEX_REGION}-docker.pkg.dev/{VERTEX_PROJECT_ID}/{AR_REPO}/{IMAGE_NAME}:latest-gpu"
 
 # Service account settings - use the Vertex AI service account or the current compute account
 # Option 1: Use the default Vertex AI service account (if it exists)
