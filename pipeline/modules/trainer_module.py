@@ -183,7 +183,7 @@ def run_fn(fn_args: tfx.components.FnArgs):
         logging.info("Using MultiWorkerMirroredStrategy for distributed training")
     else:
         # Configure GPU usage for single machine
-        gpus = tf.config.experimental.list_physical_devices("GPU")
+        gpus = tf.config.list_physical_devices("GPU")
         if gpus:
             try:
                 # Enable memory growth to prevent TensorFlow from allocating all GPU memory
@@ -205,11 +205,8 @@ def run_fn(fn_args: tfx.components.FnArgs):
         else:
             logging.warning("No GPUs detected. Training will run on CPU.")
 
-    # Verify GPU availability
-    logging.info(
-        f"GPUs available: {tf.config.experimental.list_physical_devices('GPU')}"
-    )
-    logging.info(f"GPU support: {tf.test.is_gpu_available()}")
+    # Verify GPU availability with updated API
+    logging.info(f"GPUs available: {tf.config.list_physical_devices('GPU')}")
     logging.info(f"Built with CUDA: {tf.test.is_built_with_cuda()}")
 
     tf_transform_output = tft.TFTransformOutput(fn_args.transform_output)
@@ -234,7 +231,7 @@ def run_fn(fn_args: tfx.components.FnArgs):
         optimizer = tf.keras.optimizers.Adagrad(learning_rate=learning_rate)
 
         # Use mixed precision optimizer if GPUs are available
-        if tf.config.experimental.list_physical_devices("GPU"):
+        if tf.config.list_physical_devices("GPU"):
             optimizer = tf.keras.mixed_precision.LossScaleOptimizer(optimizer)
             logging.info("Using mixed precision optimizer for GPU training")
 
@@ -359,6 +356,5 @@ def run_fn(fn_args: tfx.components.FnArgs):
         tft_layer=tft_layer,
         raw_feature_spec=tf_transform_output.raw_feature_spec(),
     )
-
 
     tf.saved_model.save(serving_model, fn_args.serving_model_dir)
