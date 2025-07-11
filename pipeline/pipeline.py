@@ -5,7 +5,9 @@ from typing import Optional
 from absl import logging
 from tfx import v1 as tfx
 from tfx.orchestration import pipeline
-from pipeline.components.bq_example_gen import create_bigquery_example_gen
+from tfx.extensions.google_cloud_big_query.example_gen.component import (
+    BigQueryExampleGen,
+)
 from ml_metadata.proto import metadata_store_pb2
 
 import config
@@ -31,25 +33,34 @@ def create_pipeline(
     transform_module_path = f"{pipeline_root}/modules/transform_module.py"
     trainer_module_path = f"{pipeline_root}/modules/trainer_module.py"
 
-    # Data ingestion - optimized for large-scale CPU processing
-    example_gen = create_bigquery_example_gen(
-        query=query,
-        project_id=project_id,
-        beam_pipeline_args=[
-            f"--project={project_id}",
-            f"--region={region}",
-            f"--service_account_email={service_account}",
-            f"--subnetwork={subnetwork}",
-            # Large-scale processing optimizations
-            "--num_workers=5",  # Reduced initial workers
-            "--max_num_workers=20",  # Reduced max workers
-            "--worker_machine_type=n1-standard-4",
-            "--use_execution_time_based_autoscaling=true",
-            # Set environment variables for protobuf compatibility
-            "--environment_type=DOCKER",
-            "--environment_config=PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python",
-        ],
-    ).with_id("hybrid-bq-example-gen")
+    # Data ingestion - use standard BigQueryExampleGen
+    example_gen = (
+        BigQueryExampleGen(
+            query=query,
+            output_config=None,
+        )
+        .with_beam_pipeline_args(
+            [
+                f"--project={project_id}",
+                f"--region={region}",
+                f"--service_account_email={service_account}",
+                f"--subnetwork={subnetwork}",
+                "--runner=DataflowRunner",
+                f"--temp_location={pipeline_root}/dataflow_temp",
+                f"--staging_location={pipeline_root}/dataflow_staging",
+                # Large-scale processing optimizations
+                "--num_workers=5",
+                "--max_num_workers=20",
+                "--worker_machine_type=n1-standard-4",
+                "--use_execution_time_based_autoscaling=true",
+                "--use_public_ips=false",
+                # Set environment variables for protobuf compatibility
+                "--environment_type=DOCKER",
+                "--environment_config=PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python",
+            ]
+        )
+        .with_id("hybrid-bq-example-gen")
+    )
 
     # Generate statistics
     statistics_gen = tfx.components.StatisticsGen(
@@ -131,12 +142,10 @@ def create_pipeline(
         "--environment_config=PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python",
     ]
 
-    # Set the Beam pipeline args for components that support it.
+    # Set the Beam pipeline args for components that support it
     for component in components:
-        # The custom ExampleGen has its Beam args set during its creation and
-        # does not support `with_beam_pipeline_args` when using a custom executor.
-        # We skip it here to avoid an AttributeError.
-        if component.id == "hybrid-bq-example-gen":  # Fixed component ID
+        # Skip the ExampleGen as it already has its args set
+        if component.id == "hybrid-bq-example-gen":
             continue
 
         if hasattr(component, "with_beam_pipeline_args"):

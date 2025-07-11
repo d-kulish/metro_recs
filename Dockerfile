@@ -62,5 +62,19 @@ RUN python3.10 -m pip install --no-cache-dir \
     --use-deprecated=legacy-resolver \
     -r docker_requirements.txt
 
+# Set working directory
+WORKDIR /app
+
+# Copy the entire project structure
+COPY . .
+
+# Create __init__.py files for proper Python module structure
+RUN touch /app/__init__.py && \
+    touch /app/pipeline/__init__.py && \
+    touch /app/pipeline/components/__init__.py
+
+# Set PYTHONPATH to include the app directory
+ENV PYTHONPATH=/app:$PYTHONPATH
+
 # Clean up
 RUN apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/*

@@ -121,6 +121,9 @@ def create_bigquery_example_gen(
         # Memory optimization
         "--worker_memory_mb=15000",
         "--use_execution_time_based_autoscaling=true",
+        # Set environment variables for protobuf compatibility
+        "--environment_type=DOCKER",
+        "--environment_config=PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python",
     ]
 
     # Merge with provided beam args
@@ -135,25 +138,18 @@ def create_bigquery_example_gen(
         ]
         final_beam_args.extend(beam_pipeline_args)
 
-    # Create a BeamExecutorSpec and add the pipeline arguments to it
-    custom_executor = executor_spec.BeamExecutorSpec(
-        executor_class=BigQueryExampleGenExecutor
-    )
-    custom_executor.add_beam_pipeline_args(final_beam_args)
-
-    # Use the standard BigQueryExampleGen from TFX extensions
+    # Use standard BigQueryExampleGen instead of custom executor
+    # This avoids the import path issues with custom executors
     component = BigQueryExampleGen(
         query=query,
-        custom_config={
-            "project_id": project_id,
-            "large_scale_processing": True,
-            "hybrid_architecture": True,
-            # Optimize for large datasets
-            "batch_size": 10000,
-            "use_avro_export": True,
-        },
         output_config=output_config,
-        custom_executor_spec=custom_executor,
     )
 
+    # Apply beam pipeline args using the with_beam_pipeline_args method
+    component = component.with_beam_pipeline_args(final_beam_args)
+
     return component
+
+
+# Make the executor class available at module level for TFX import
+__all__ = ["BigQueryExampleGenExecutor", "create_bigquery_example_gen"]

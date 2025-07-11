@@ -1,1 +1,1 @@
-"""Pipeline package for Metro recommendations."""
+"""Pipeline module for Metro recommendations."""
