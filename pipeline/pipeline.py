@@ -61,8 +61,7 @@ def create_pipeline(
     )
 
     # Model training
-    # To run on GPUs, we use the specialized Trainer for Vertex AI, which allows
-    # us to specify machine types and accelerators.
+    # Use Vertex AI Trainer instead of the legacy AI Platform Trainer
     trainer = tfx.extensions.google_cloud_ai_platform.Trainer(
         module_file=os.path.abspath("pipeline/modules/trainer_module.py"),
         examples=transform.outputs["transformed_examples"],
@@ -77,19 +76,25 @@ def create_pipeline(
             "epochs": config.TRAIN_EPOCHS,
             "project_id": project_id,
             "products_query": config.BQ_PRODUCTS_QUERY,
-            # Configuration for the AI Platform Training job (corrected format)
-            "ai_platform_training_args": {
+            # Configuration for Vertex AI Training job (correct format)
+            "vertex_training_args": {
                 "project": project_id,
-                "region": region,
-                "masterConfig": {
-                    "imageUri": config.PIPELINE_IMAGE,
-                    "acceleratorConfig": {
-                        "type": "NVIDIA_TESLA_T4",
-                        "count": 1,
-                    },
-                },
-                "scaleTier": "CUSTOM",
-                "masterType": "n1-standard-4",
+                "location": region,
+                "display_name": f"{config.PIPELINE_NAME}-training",
+                "worker_pool_specs": [
+                    {
+                        "machine_spec": {
+                            "machine_type": "n1-standard-4",
+                            "accelerator_type": "NVIDIA_TESLA_T4",
+                            "accelerator_count": 1,
+                        },
+                        "replica_count": 1,
+                        "container_spec": {
+                            "image_uri": config.PIPELINE_IMAGE,
+                        },
+                    }
+                ],
+                "service_account": service_account,
             },
         },
     )
