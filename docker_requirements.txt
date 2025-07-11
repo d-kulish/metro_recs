@@ -10,6 +10,7 @@ tfx-bsl==1.14.0
 tensorflow==2.13.1
 tensorflow-transform==1.14.0
 tensorflow-recommenders==0.7.3
+tensorflow-serving-api==2.13.1
 keras==2.13.1
 
 # Apache Beam - compatible with TFX 1.14.0

@@ -7,13 +7,15 @@ import apache_beam as beam
 # Set protobuf implementation to avoid version conflicts
 os.environ.setdefault("PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION", "python")
 
-# Avoid direct TensorFlow protobuf imports to prevent version conflicts
-# Instead, use the TFX utilities that handle protobuf compatibility
+# Use TFX utilities that handle protobuf compatibility
 from tfx.utils import io_utils
 from tfx.types import standard_artifacts
 from tfx.components.example_gen.base_example_gen_executor import BaseExampleGenExecutor
 from tfx.components.example_gen.component import FileBasedExampleGen
 from tfx.dsl.components.base import executor_spec
+
+# Import TFX's example utilities instead of direct TensorFlow
+from tfx.utils import example_gen_utils
 
 
 @beam.ptransform_fn
@@ -41,31 +43,67 @@ def _BigQueryToExample(  # pylint: disable=invalid-name
 
     def row_to_example(formatted_row: Dict[str, Any]) -> bytes:
         """Convert formatted row to serialized TF Example using TFX utilities."""
-        # Ensure protobuf compatibility
-        os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
+        # Use TFX's example generation utilities to avoid TensorFlow imports
+        # This prevents protobuf conflicts in the Beam pipeline
 
-        # Use TFX's built-in utilities to create examples safely
-        # This avoids direct protobuf imports and version conflicts
-        import tensorflow as tf
+        # Create feature dictionary in the format expected by TFX
+        features = {}
 
-        feature_dict = {}
-
-        # Add string features
+        # String features
         for key in ["cust_person_id", "product_id", "city", "date_of_day"]:
             value = formatted_row.get(key, "")
-            feature_dict[key] = tf.train.Feature(
-                bytes_list=tf.train.BytesList(value=[value.encode("utf-8")])
-            )
+            features[key] = {"bytes_list": {"value": [value.encode("utf-8")]}}
 
-        # Add float features
+        # Float features
         for key in ["sell_val_nsp", "total_revenue"]:
             value = float(formatted_row.get(key, 0.0))
-            feature_dict[key] = tf.train.Feature(
-                float_list=tf.train.FloatList(value=[value])
-            )
+            features[key] = {"float_list": {"value": [value]}}
 
-        example = tf.train.Example(features=tf.train.Features(feature=feature_dict))
-        return example.SerializeToString()
+        # Create example dictionary
+        example_dict = {"features": {"feature": features}}
+
+        # Use TFX utilities to create the serialized example
+        # This avoids direct TensorFlow imports in the Beam pipeline
+        try:
+            from tensorflow_metadata.proto.v0 import example_pb2
+
+            example = example_pb2.Example()
+
+            # Manually populate the example to avoid TensorFlow imports
+            for feature_name, feature_value in features.items():
+                if "bytes_list" in feature_value:
+                    example.features.feature[feature_name].bytes_list.value.extend(
+                        feature_value["bytes_list"]["value"]
+                    )
+                elif "float_list" in feature_value:
+                    example.features.feature[feature_name].float_list.value.extend(
+                        feature_value["float_list"]["value"]
+                    )
+
+            return example.SerializeToString()
+        except ImportError:
+            # Fallback: Use TensorFlow if tensorflow_metadata is not available
+            # This should only happen in development environments
+            import tensorflow as tf
+
+            feature_dict = {}
+
+            # Add string features
+            for key in ["cust_person_id", "product_id", "city", "date_of_day"]:
+                value = formatted_row.get(key, "")
+                feature_dict[key] = tf.train.Feature(
+                    bytes_list=tf.train.BytesList(value=[value.encode("utf-8")])
+                )
+
+            # Add float features
+            for key in ["sell_val_nsp", "total_revenue"]:
+                value = float(formatted_row.get(key, 0.0))
+                feature_dict[key] = tf.train.Feature(
+                    float_list=tf.train.FloatList(value=[value])
+                )
+
+            example = tf.train.Example(features=tf.train.Features(feature=feature_dict))
+            return example.SerializeToString()
 
     return (
         pipeline
@@ -158,5 +196,4 @@ def create_bigquery_example_gen(
         custom_executor_spec=custom_executor,
     )
 
-    return component
     return component

@@ -42,6 +42,9 @@ COPY docker_requirements.txt .
 # Install stable TensorFlow 2.13.1 with GPU support
 RUN python3.10 -m pip install --no-cache-dir tensorflow[and-cuda]==2.13.1
 
+# Install compatible TensorFlow Serving API
+RUN python3.10 -m pip install --no-cache-dir tensorflow-serving-api==2.13.1
+
 # Install protobuf first with compatible version
 RUN python3.10 -m pip install --no-cache-dir protobuf==3.20.3
 
