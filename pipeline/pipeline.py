@@ -61,8 +61,8 @@ def create_pipeline(
     )
 
     # Model training with GPU support using Vertex AI Training
-    # Use standard Trainer with proper Vertex AI configuration
-    trainer = tfx.components.Trainer(
+    # Use the Vertex AI extension which actually supports GPU configuration
+    trainer = tfx.extensions.google_cloud_ai_platform.v2.Trainer(
         module_file=os.path.abspath("pipeline/modules/trainer_module.py"),
         examples=transform.outputs["transformed_examples"],
         transform_graph=transform.outputs["transform_graph"],
@@ -73,7 +73,7 @@ def create_pipeline(
             "epochs": config.TRAIN_EPOCHS,
             "project_id": project_id,
             "products_query": config.BQ_PRODUCTS_QUERY,
-            # Use ONLY Vertex AI Training configuration
+            # Use Vertex AI Training configuration that actually works
             "vertex_job_spec": {
                 "worker_pool_specs": [
                     {
@@ -85,19 +85,16 @@ def create_pipeline(
                         "replica_count": 1,
                         "container_spec": {
                             "image_uri": config.PIPELINE_IMAGE,
-                            "args": [
-                                f"--distributed-training={config.ENABLE_DISTRIBUTED_TRAINING}",
-                                f"--batch-size={config.BATCH_SIZE}",
-                                f"--learning-rate={config.LEARNING_RATE}",
-                            ],
                         },
                     }
                 ],
-                "scheduling": {
-                    "disable_retries": True,
-                },
-                "service_account": service_account,
             },
+            # Pass training arguments separately
+            "training_args": [
+                f"--distributed-training={config.ENABLE_DISTRIBUTED_TRAINING}",
+                f"--batch-size={config.BATCH_SIZE}",
+                f"--learning-rate={config.LEARNING_RATE}",
+            ],
         },
     )
 
@@ -111,9 +108,7 @@ def create_pipeline(
     ]
 
     # Set the Beam pipeline args for components that support it.
-    # This is needed to run the Beam-based components on Dataflow.
     for component in components:
-        # Not all components are Beam-based and support this method.
         if hasattr(component, "with_beam_pipeline_args"):
             component.with_beam_pipeline_args(
                 [
@@ -124,8 +119,6 @@ def create_pipeline(
                     f"--staging_location={pipeline_root}/staging",
                     f"--service_account_email={service_account}",
                     f"--subnetwork={subnetwork}",
-                    # Prevent Dataflow workers from using public IPs. This is a common requirement
-                    # in secure VPC environments and relies on Private Google Access being enabled.
                     "--no_use_public_ips",
                 ]
             )
@@ -136,6 +129,10 @@ def create_pipeline(
         "components": components,
         "enable_cache": enable_cache,
     }
+
+    if metadata_connection_config is not None:
+        pipeline_kwargs["metadata_connection_config"] = metadata_connection_config
+
 
     # Only add metadata_connection_config if it's not None
     if metadata_connection_config is not None:

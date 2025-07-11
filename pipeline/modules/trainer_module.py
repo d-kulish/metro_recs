@@ -161,6 +161,17 @@ def _build_product_model(
 
 def run_fn(fn_args: tfx.components.FnArgs):
     """Main training function called by TFX Trainer."""
+    # Extract batch size and learning rate from training_args
+    batch_size = 4096  # default
+    learning_rate = 0.1  # default
+
+    training_args = fn_args.custom_config.get("training_args", [])
+    for arg in training_args:
+        if arg.startswith("--batch-size="):
+            batch_size = int(arg.split("=")[1])
+        elif arg.startswith("--learning-rate="):
+            learning_rate = float(arg.split("=")[1])
+
     # Check if distributed training is enabled
     # Handle vertex_job_spec configuration
     vertex_job_spec = fn_args.custom_config.get("vertex_job_spec", {})
