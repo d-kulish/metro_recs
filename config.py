@@ -190,6 +190,11 @@ SCALING_CONFIG = {
     },
 }
 
+# Distributed Training Configuration
+ENABLE_DISTRIBUTED_TRAINING = False
+WORKER_COUNT = 0  # 0 means no workers (single machine training)
+PARAMETER_SERVER_COUNT = 0  # 0 means no parameter servers
+
 
 # Function to apply scaling configuration
 def apply_scaling_config(config_name):

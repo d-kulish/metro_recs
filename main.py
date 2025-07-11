@@ -153,7 +153,7 @@ def run_pipeline():
                 logging.warning("Could not configure Vertex metadata. Using default.")
                 metadata_config = None
 
-            # Create the pipeline
+            # Create the pipeline - ensure all required config attributes exist
             pipeline = create_pipeline(
                 pipeline_name=config.PIPELINE_NAME,
                 pipeline_root=config.PIPELINE_ROOT,
@@ -262,7 +262,32 @@ def main(_):
     os.environ["TF_DISABLE_MKL"] = "1"
     os.environ["TF_DISABLE_SEGMENT_REDUCTION_OP_DETERMINISM_EXCEPTIONS"] = "1"
 
-    run_pipeline()
+    # Add error handling for missing config attributes
+    try:
+        # Check for required config attributes
+        required_attrs = [
+            "PIPELINE_NAME",
+            "PIPELINE_ROOT",
+            "BQ_QUERY",
+            "PROJECT_ID",
+            "VERTEX_REGION",
+            "VERTEX_SERVICE_ACCOUNT",
+            "DATAFLOW_SUBNETWORK",
+            "ENABLE_DISTRIBUTED_TRAINING",
+            "BATCH_SIZE",
+            "LEARNING_RATE",
+        ]
+
+        missing_attrs = [attr for attr in required_attrs if not hasattr(config, attr)]
+        if missing_attrs:
+            logging.error(f"Missing config attributes: {missing_attrs}")
+            raise AttributeError(f"Config missing required attributes: {missing_attrs}")
+
+        run_pipeline()
+
+    except Exception as e:
+        logging.error(f"Pipeline execution failed: {e}", exc_info=True)
+        raise
 
 
 if __name__ == "__main__":
