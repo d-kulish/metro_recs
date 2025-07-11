@@ -1,7 +1,11 @@
 """Custom BigQuery ExampleGen component for large-scale data processing."""
 
+import os
 from typing import Optional, Dict, Any
 import apache_beam as beam
+
+# Set protobuf implementation to avoid version conflicts
+os.environ.setdefault("PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION", "python")
 
 # Avoid direct TensorFlow protobuf imports to prevent version conflicts
 # Instead, use the TFX utilities that handle protobuf compatibility
@@ -37,6 +41,9 @@ def _BigQueryToExample(  # pylint: disable=invalid-name
 
     def row_to_example(formatted_row: Dict[str, Any]) -> bytes:
         """Convert formatted row to serialized TF Example using TFX utilities."""
+        # Ensure protobuf compatibility
+        os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
+
         # Use TFX's built-in utilities to create examples safely
         # This avoids direct protobuf imports and version conflicts
         import tensorflow as tf

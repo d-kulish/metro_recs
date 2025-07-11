@@ -8,6 +8,8 @@ ENV CUDA_VISIBLE_DEVICES=0
 ENV TFX_USE_VERTEX_AI_TRAINING=true
 # Force TensorFlow to use Keras 2.13.1 (stable combination)
 ENV TF_USE_LEGACY_KERAS=1
+# Fix protobuf compatibility issues
+ENV PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 
 # Install Python 3.10 and system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -39,6 +41,9 @@ COPY docker_requirements.txt .
 
 # Install stable TensorFlow 2.13.1 with GPU support
 RUN python3.10 -m pip install --no-cache-dir tensorflow[and-cuda]==2.13.1
+
+# Install protobuf first with compatible version
+RUN python3.10 -m pip install --no-cache-dir protobuf==3.20.3
 
 # Install remaining packages with legacy resolver for compatibility
 RUN python3.10 -m pip install --no-cache-dir \

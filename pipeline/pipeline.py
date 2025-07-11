@@ -10,6 +10,9 @@ from ml_metadata.proto import metadata_store_pb2
 
 import config
 
+# Set protobuf implementation early
+os.environ.setdefault("PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION", "python")
+
 
 def create_pipeline(
     pipeline_name: str,
@@ -42,9 +45,9 @@ def create_pipeline(
             "--max_num_workers=30",
             "--worker_machine_type=n1-standard-4",
             "--use_execution_time_based_autoscaling=true",
-            # Add environment variables for protobuf compatibility
+            # Set environment variables for protobuf compatibility
             "--environment_type=DOCKER",
-            "--environment_config={'PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION': 'python'}",
+            "--environment_config=PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python",
         ],
     ).with_id("hybrid-bq-example-gen")
 
@@ -123,6 +126,9 @@ def create_pipeline(
         "--max_num_workers=20",
         "--worker_machine_type=n1-standard-2",
         "--use_execution_time_based_autoscaling=true",
+        # Add protobuf environment variable for all Dataflow workers
+        "--environment_type=DOCKER",
+        "--environment_config=PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python",
     ]
 
     # Set the Beam pipeline args for components that support it.
