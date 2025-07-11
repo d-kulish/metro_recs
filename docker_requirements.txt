@@ -1,25 +1,26 @@
-# This file lists all Python packages for the custom pipeline container.
-# Use tfx with docker extra to get pre-tested compatible versions
+# Based on TFX 1.15.0 compatibility matrix
+
+# Core TFX stack with exact versions
 tfx==1.15.0
-
-# Kubeflow Pipelines - REQUIRED for Vertex AI execution
 kfp==2.7.0
-
-# ML Metadata - REQUIRED for TFX metadata management
 ml-metadata==1.15.0
-
-# TensorFlow Recommenders - specify compatible version
-tensorflow-recommenders==0.7.3
-
-# BigQuery client for trainer module
-google-cloud-bigquery==3.11.4
-
-# TensorFlow Transform BSL - needed for transform operations
 tfx-bsl==1.15.1
 
-# Apache Beam with GCP support for Dataflow
+# TensorFlow stack - pin to versions compatible with TFX 1.15.0
+tensorflow==2.15.1
+tensorflow-transform==1.15.0
+tensorflow-recommenders==0.7.3
+
+# Apache Beam - use exact version from TFX requirements
 apache-beam[gcp]==2.53.0
 
-# Core dependencies with version constraints
-absl-py>=1.4.0
-protobuf>=4.25.0,<5.0.0
+# Google Cloud libraries - use versions compatible with TFX 1.15.0
+google-cloud-bigquery==3.11.4
+google-cloud-storage==2.10.0
+
+# Core dependencies with exact versions to avoid conflicts
+grpcio==1.60.1
+grpcio-status==1.60.1
+protobuf==4.25.1
+absl-py==1.4.0
+googleapis-common-protos==1.61.0

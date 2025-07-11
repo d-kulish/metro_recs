@@ -4,11 +4,32 @@ FROM python:3.10-slim
 # Copy the requirements file that specifies our additional libraries.
 COPY docker_requirements.txt .
 
-# Install build-essential for compiling C++ extensions like pyfarmhash,
-# then install all Python packages in a single layer, and finally clean up
-# the build tools to keep the final image slim.
-RUN apt-get update && apt-get install -y --no-install-recommends build-essential && \
-    pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r docker_requirements.txt && \
-    apt-get purge -y --auto-remove build-essential && \
-    rm -rf /var/lib/apt/lists/*
+# Install system dependencies and Python packages in separate steps
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Upgrade pip and install packages with more lenient resolver
+RUN pip install --no-cache-dir --upgrade pip
+
+# Install packages in order of dependency complexity
+RUN pip install --no-cache-dir \
+    --no-deps \
+    tensorflow==2.15.1
+
+RUN pip install --no-cache-dir \
+    --no-deps \
+    tensorflow-transform==1.15.0
+
+RUN pip install --no-cache-dir \
+    --no-deps \
+    tensorflow-recommenders==0.7.3
+
+# Install remaining packages
+RUN pip install --no-cache-dir \
+    --use-deprecated=legacy-resolver \
+    -r docker_requirements.txt
+
+# Clean up build dependencies
+RUN apt-get purge -y --auto-remove build-essential git
