@@ -8,9 +8,13 @@ import apache_beam as beam
 os.environ.setdefault("PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION", "python")
 
 from tfx.components.example_gen import base_example_gen_executor
-from tfx.components.example_gen.component import QueryBasedExampleGen
 from tfx.dsl.components.base import executor_spec
 from tfx.proto import example_gen_pb2
+
+# Use TFX's BigQuery extension
+from tfx.extensions.google_cloud_big_query.example_gen.component import (
+    BigQueryExampleGen,
+)
 
 
 @beam.ptransform_fn
@@ -93,7 +97,7 @@ def create_bigquery_example_gen(
     project_id: str,
     output_config: Optional[example_gen_pb2.Output] = None,
     beam_pipeline_args: Optional[list] = None,
-) -> QueryBasedExampleGen:
+) -> BigQueryExampleGen:
     """Creates a BigQuery ExampleGen component optimized for large datasets."""
 
     # Optimized beam args for large-scale processing
@@ -137,11 +141,10 @@ def create_bigquery_example_gen(
     )
     custom_executor.add_beam_pipeline_args(final_beam_args)
 
-    # Use QueryBasedExampleGen instead of FileBasedExampleGen
-    component = QueryBasedExampleGen(
+    # Use the standard BigQueryExampleGen from TFX extensions
+    component = BigQueryExampleGen(
         query=query,
         custom_config={
-            "query": query,
             "project_id": project_id,
             "large_scale_processing": True,
             "hybrid_architecture": True,
@@ -154,4 +157,3 @@ def create_bigquery_example_gen(
     )
 
     return component
-
