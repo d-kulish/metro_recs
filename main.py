@@ -14,9 +14,81 @@ FLAGS = flags.FLAGS
 flags.DEFINE_enum("runner", "vertex", ["local", "vertex"], "Pipeline runner to use.")
 
 
+def cleanup_disk_space():
+    """Aggressively clean up disk space."""
+    logging.info("Starting aggressive disk cleanup...")
+
+    cleanup_commands = [
+        # Clean apt cache
+        "sudo apt-get clean",
+        # Clean pip cache
+        "pip cache purge",
+        # Clean conda cache if available
+        "conda clean -a -y || true",
+        # Remove old log files
+        "sudo find /var/log -name '*.log' -type f -mtime +7 -delete || true",
+        # Clean temp directories
+        "sudo rm -rf /tmp/* || true",
+        "sudo rm -rf /var/tmp/* || true",
+        # Clean Docker if available
+        "docker system prune -f || true",
+    ]
+
+    for cmd in cleanup_commands:
+        try:
+            subprocess.run(cmd, shell=True, check=False)
+            logging.info(f"Executed: {cmd}")
+        except Exception as e:
+            logging.warning(f"Failed to execute {cmd}: {e}")
+
+    # Clean Python cache files
+    import glob
+
+    cache_patterns = [
+        "**/__pycache__",
+        "**/*.pyc",
+        "**/*.pyo",
+        os.path.expanduser("~/.cache/*"),
+        "/tmp/tmp*",
+    ]
+
+    for pattern in cache_patterns:
+        for cache_file in glob.glob(pattern, recursive=True):
+            try:
+                if os.path.isdir(cache_file):
+                    shutil.rmtree(cache_file)
+                else:
+                    os.remove(cache_file)
+                logging.debug(f"Removed cache: {cache_file}")
+            except Exception as e:
+                logging.debug(f"Could not remove {cache_file}: {e}")
+
+
+def check_and_free_disk_space():
+    """Check disk space and attempt to free up space if needed."""
+    total, used, free = shutil.disk_usage("/")
+    free_gb = free // (1024**3)
+    used_gb = used // (1024**3)
+    total_gb = total // (1024**3)
+
+    logging.info(
+        f"Disk usage: {used_gb} GB used / {total_gb} GB total ({free_gb} GB free)"
+    )
+
+    if free_gb < 5:
+        logging.warning(f"Low disk space detected: {free_gb} GB free")
+        cleanup_disk_space()
+
+        # Check again after cleanup
+        total, used, free = shutil.disk_usage("/")
+        free_gb = free // (1024**3)
+        logging.info(f"After cleanup: {free_gb} GB free")
+
+    return free_gb
+
+
 def run_pipeline():
     """Run the TFX pipeline."""
-
     runner = None
     metadata_config = None
 
@@ -28,7 +100,6 @@ def run_pipeline():
         # Pre-upload modules to avoid packaging issues
         try:
             logging.info("Pre-uploading modules to GCS...")
-            # Create a modules directory in GCS
             modules_path = f"{config.PIPELINE_ROOT}/modules"
 
             # Use gsutil to copy modules (more reliable than TF file operations)
@@ -52,17 +123,16 @@ def run_pipeline():
             default_image=config.PIPELINE_IMAGE,
         )
 
-        # Create a temporary directory for the pipeline JSON with better error handling
+        # Create a minimal temporary directory
         temp_dir = None
         try:
-            # Use /tmp instead of default temp directory for more space
-            temp_dir = tempfile.mkdtemp(prefix="tfx_pipeline_", dir="/tmp")
+            # Use minimal temp space - just for the JSON file
+            temp_dir = tempfile.mkdtemp(prefix="tfx_", dir="/tmp")
             pipeline_json_path = os.path.join(temp_dir, f"{config.PIPELINE_NAME}.json")
 
-            # Ensure the temp directory has proper permissions
             os.chmod(temp_dir, 0o755)
 
-            # Set environment variables to use different temp locations
+            # Set minimal environment variables
             os.environ["TMPDIR"] = temp_dir
             os.environ["TMP"] = temp_dir
             os.environ["TEMP"] = temp_dir
@@ -95,41 +165,26 @@ def run_pipeline():
                 metadata_connection_config=metadata_config,
             )
 
-            logging.info(
-                f"Compiling pipeline '{config.PIPELINE_NAME}' with runner '{FLAGS.runner}'"
-            )
+            logging.info(f"Compiling pipeline '{config.PIPELINE_NAME}'")
             logging.info(f"Pipeline root: {config.PIPELINE_ROOT}")
-            logging.info(f"Temp directory: {temp_dir}")
 
-            # Clear any existing TensorFlow cached files
-            try:
-                tf_cache_dir = os.path.expanduser("~/.cache/tensorflow")
-                if os.path.exists(tf_cache_dir):
-                    shutil.rmtree(tf_cache_dir)
-                    logging.info("Cleared TensorFlow cache")
-            except Exception as e:
-                logging.warning(f"Could not clear TF cache: {e}")
-
-            # Compile the pipeline with additional error handling
+            # Compile the pipeline
             try:
                 runner.run(pipeline)
             except Exception as e:
                 logging.error(f"Pipeline compilation failed: {e}")
-                # Try to clean up any partial files
                 if os.path.exists(pipeline_json_path):
                     os.remove(pipeline_json_path)
                 raise
 
-            # Now submit the compiled pipeline to Vertex AI
+            # Submit the pipeline to Vertex AI
             logging.info("Submitting pipeline to Vertex AI...")
 
-            # Initialize Vertex AI client
             aiplatform.init(
                 project=config.VERTEX_PROJECT_ID,
                 location=config.VERTEX_REGION,
             )
 
-            # Submit the pipeline
             job = aiplatform.PipelineJob(
                 display_name=config.PIPELINE_NAME,
                 template_path=pipeline_json_path,
@@ -143,15 +198,12 @@ def run_pipeline():
 
             try:
                 logging.info(f"Submitting pipeline job: {config.PIPELINE_NAME}")
-                # Pass the service account to ensure the pipeline runs with the correct permissions.
                 job.submit(service_account=config.VERTEX_SERVICE_ACCOUNT)
                 logging.info(
                     f"Pipeline submitted successfully. Job name: {job.resource_name}"
                 )
-                # The dashboard URI is available after the job object is created/submitted.
                 logging.info(f"You can view the pipeline at: {job._dashboard_uri()}")
             except Exception as e:
-                # Provide more detailed error logging.
                 logging.error(f"Failed to submit pipeline: {e}", exc_info=True)
                 raise e
 
@@ -193,41 +245,22 @@ def run_pipeline():
 def main(_):
     logging.set_verbosity(logging.INFO)
 
-    # Set TensorFlow environment variables to avoid file I/O issues
-    os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "1")
+    # Check and free up disk space first
+    free_gb = check_and_free_disk_space()
 
-    # Set additional environment variables to help with file I/O
+    if free_gb < 2:  # Reduced minimum requirement
+        logging.error(f"Critical: Only {free_gb} GB available. Cannot proceed safely.")
+        logging.error("Please free up disk space manually:")
+        logging.error("1. Run: sudo apt-get clean")
+        logging.error("2. Run: pip cache purge")
+        logging.error("3. Remove large files from ~/")
+        logging.error("4. Run: docker system prune -f (if Docker is installed)")
+        raise RuntimeError(f"Insufficient disk space: {free_gb} GB")
+
+    # Set TensorFlow environment variables
+    os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "1")
     os.environ["TF_DISABLE_MKL"] = "1"
     os.environ["TF_DISABLE_SEGMENT_REDUCTION_OP_DETERMINISM_EXCEPTIONS"] = "1"
-
-    # Clear any existing temporary files
-    import glob
-
-    temp_patterns = ["/tmp/tfx_*", "/tmp/tmp*tfx*", os.path.expanduser("~/tmp*tfx*")]
-
-    for pattern in temp_patterns:
-        for temp_file in glob.glob(pattern):
-            try:
-                if os.path.isdir(temp_file):
-                    shutil.rmtree(temp_file)
-                else:
-                    os.remove(temp_file)
-                logging.info(f"Cleaned up existing temp file: {temp_file}")
-            except Exception as e:
-                logging.debug(f"Could not clean up {temp_file}: {e}")
-
-    # Ensure we have enough disk space by checking available space
-    import shutil as disk_util
-
-    total, used, free = disk_util.disk_usage("/")
-    free_gb = free // (1024**3)
-    logging.info(f"Available disk space: {free_gb} GB")
-
-    if free_gb < 10:  # Less than 10GB free
-        logging.error(
-            f"Insufficient disk space: {free_gb} GB available. Need at least 10GB."
-        )
-        raise RuntimeError(f"Insufficient disk space: {free_gb} GB")
 
     run_pipeline()
 
