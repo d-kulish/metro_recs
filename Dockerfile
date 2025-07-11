@@ -73,8 +73,8 @@ RUN touch /app/__init__.py && \
     touch /app/pipeline/__init__.py && \
     touch /app/pipeline/components/__init__.py
 
-# Set PYTHONPATH to include the app directory
-ENV PYTHONPATH=/app:$PYTHONPATH
+# Set PYTHONPATH to include the app directory (fix undefined variable warning)
+ENV PYTHONPATH=/app
 
 # Clean up
 RUN apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/*
