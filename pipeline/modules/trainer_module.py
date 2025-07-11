@@ -172,23 +172,8 @@ def run_fn(fn_args: tfx.components.FnArgs):
         elif arg.startswith("--learning-rate="):
             learning_rate = float(arg.split("=")[1])
 
-    # Check if distributed training is enabled
-    # Handle vertex_job_spec configuration
-    vertex_job_spec = fn_args.custom_config.get("vertex_job_spec", {})
-    worker_pool_specs = vertex_job_spec.get("worker_pool_specs", [])
-
-    # Extract distributed training config from worker pool specs
-    is_distributed = (
-        len(worker_pool_specs) > 0 and worker_pool_specs[0].get("replica_count", 1) > 1
-    )
-
-    # Also check legacy config for backward compatibility
-    legacy_args = fn_args.custom_config.get("ai_platform_training_args", {}).get(
-        "args", []
-    )
-    is_distributed = is_distributed or any(
-        "--distributed-training=True" in arg for arg in legacy_args
-    )
+    # Check if distributed training is enabled from training_args
+    is_distributed = any("--distributed-training=True" in arg for arg in training_args)
 
     # Configure distributed training strategy
     strategy = None

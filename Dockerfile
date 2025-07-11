@@ -35,8 +35,8 @@ RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
 # Copy the requirements file
 COPY docker_requirements.txt .
 
-# Install TensorFlow GPU version first (it includes CUDA libraries)
-RUN python3.10 -m pip install --no-cache-dir tensorflow[and-cuda]==2.15.1
+# Install TensorFlow GPU version that matches TFX 1.16.0
+RUN python3.10 -m pip install --no-cache-dir tensorflow[and-cuda]==2.16.1
 
 # Install remaining packages
 RUN python3.10 -m pip install --no-cache-dir \

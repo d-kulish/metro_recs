@@ -21,22 +21,7 @@ def create_pipeline(
     enable_cache: bool = True,
     metadata_connection_config: Optional[metadata_store_pb2.ConnectionConfig] = None,
 ) -> pipeline.Pipeline:
-    """Create TFX pipeline for Metro recommendations.
-
-    Args:
-        pipeline_name: Name of the pipeline
-        pipeline_root: Root path for pipeline artifacts
-        query: BigQuery SQL query
-        project_id: GCP project ID
-        region: GCP region
-        service_account: Service account email for Dataflow workers
-        subnetwork: Dataflow subnetwork
-        enable_cache: Whether to enable caching
-        metadata_connection_config: Metadata connection config
-
-    Returns:
-        TFX Pipeline instance
-    """
+    """Create TFX pipeline for Metro recommendations."""
 
     # Data ingestion for training examples (user-product interactions)
     example_gen = tfx.extensions.google_cloud_big_query.BigQueryExampleGen(
@@ -60,9 +45,8 @@ def create_pipeline(
         module_file=os.path.abspath("pipeline/modules/transform_module.py"),
     )
 
-    # Model training with GPU support using Vertex AI Training
-    # Use the Vertex AI extension which actually supports GPU configuration
-    trainer = tfx.extensions.google_cloud_ai_platform.v2.Trainer(
+    # Model training with GPU support using TFX 1.16.0
+    trainer = tfx.components.Trainer(
         module_file=os.path.abspath("pipeline/modules/trainer_module.py"),
         examples=transform.outputs["transformed_examples"],
         transform_graph=transform.outputs["transform_graph"],
@@ -73,28 +57,25 @@ def create_pipeline(
             "epochs": config.TRAIN_EPOCHS,
             "project_id": project_id,
             "products_query": config.BQ_PRODUCTS_QUERY,
-            # Use Vertex AI Training configuration that actually works
-            "vertex_job_spec": {
-                "worker_pool_specs": [
-                    {
-                        "machine_spec": {
-                            "machine_type": config.GPU_MACHINE_TYPE,
-                            "accelerator_type": config.GPU_ACCELERATOR_TYPE,
-                            "accelerator_count": config.GPU_ACCELERATOR_COUNT,
-                        },
-                        "replica_count": 1,
-                        "container_spec": {
-                            "image_uri": config.PIPELINE_IMAGE,
-                        },
-                    }
-                ],
-            },
-            # Pass training arguments separately
+            # Training arguments
             "training_args": [
                 f"--distributed-training={config.ENABLE_DISTRIBUTED_TRAINING}",
                 f"--batch-size={config.BATCH_SIZE}",
                 f"--learning-rate={config.LEARNING_RATE}",
             ],
+            # Add Vertex AI Training configuration for TFX 1.16.0
+            "ai_platform_training_args": {
+                "project": project_id,
+                "region": region,
+                "masterConfig": {
+                    "imageUri": config.PIPELINE_IMAGE,
+                    "machineType": config.GPU_MACHINE_TYPE,
+                    "acceleratorConfig": {
+                        "type": config.GPU_ACCELERATOR_TYPE,
+                        "count": config.GPU_ACCELERATOR_COUNT,
+                    },
+                },
+            },
         },
     )
 
@@ -130,22 +111,6 @@ def create_pipeline(
         "enable_cache": enable_cache,
     }
 
-    if metadata_connection_config is not None:
-        pipeline_kwargs["metadata_connection_config"] = metadata_connection_config
-
-
-    # Only add metadata_connection_config if it's not None
-    if metadata_connection_config is not None:
-        pipeline_kwargs["metadata_connection_config"] = metadata_connection_config
-
-    pipeline_kwargs = {
-        "pipeline_name": pipeline_name,
-        "pipeline_root": pipeline_root,
-        "components": components,
-        "enable_cache": enable_cache,
-    }
-
-    # Only add metadata_connection_config if it's not None
     if metadata_connection_config is not None:
         pipeline_kwargs["metadata_connection_config"] = metadata_connection_config
 
