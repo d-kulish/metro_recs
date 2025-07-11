@@ -45,6 +45,12 @@ RUN python3.10 -m pip install --no-cache-dir tensorflow[and-cuda]==2.13.1
 # Install protobuf first with compatible version
 RUN python3.10 -m pip install --no-cache-dir protobuf==3.20.3
 
+# Install compatible jsonschema stack to avoid version conflicts
+RUN python3.10 -m pip install --no-cache-dir \
+    attrs==22.2.0 \
+    referencing==0.28.4 \
+    jsonschema==4.17.3
+
 # Install remaining packages with legacy resolver for compatibility
 RUN python3.10 -m pip install --no-cache-dir \
     --use-deprecated=legacy-resolver \

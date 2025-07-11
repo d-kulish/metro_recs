@@ -41,6 +41,11 @@ protobuf==3.20.3
 absl-py==1.4.0
 googleapis-common-protos==1.59.1
 
+# JSON Schema validation - compatible versions
+jsonschema==4.17.3
+referencing==0.28.4
+attrs==22.2.0
+
 # Additional dependencies for Google Cloud integration
 google-cloud-core==2.3.3
 cachetools==5.3.1
