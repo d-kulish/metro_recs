@@ -4,6 +4,7 @@ import os
 from typing import Optional
 from absl import logging
 from tfx import v1 as tfx
+from tfx.orchestration.kubeflow.v2.proto import kubeflow_deployment_config_pb2
 from tfx.orchestration import pipeline
 from ml_metadata.proto import metadata_store_pb2
 
@@ -79,8 +80,16 @@ def create_pipeline(
         },
     )
 
-    # Note: GPU configuration is handled at the Vertex AI Pipelines cluster level
-    # Your GPU-enabled Docker image will automatically use GPUs when available
+    # To use GPUs on Vertex AI, we must specify the accelerator configuration
+    # in a platform-specific config for the Kubeflow v2 runner. This will
+    # instruct Vertex AI to run the Trainer component on a node with the
+    # specified GPU.
+    gpu_config = kubeflow_deployment_config_pb2.KubeflowDeploymentConfig(
+        accelerator=kubeflow_deployment_config_pb2.AcceleratorConfig(
+            type="NVIDIA_TESLA_T4", count=1
+        )
+    )
+    trainer.with_platform_config(gpu_config)
 
     # Set container image for all components when running on Vertex AI
     components = [
@@ -123,5 +132,3 @@ def create_pipeline(
         pipeline_kwargs["metadata_connection_config"] = metadata_connection_config
 
     return pipeline.Pipeline(**pipeline_kwargs)
-
-
