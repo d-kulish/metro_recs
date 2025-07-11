@@ -4,8 +4,9 @@ import os
 from typing import Optional
 from absl import logging
 from tfx import v1 as tfx
-# Use a direct import style which can be more robust in complex environments.
-import tfx.proto.orchestration.kubeflow_deployment_config_pb2 as kubeflow_deployment_config_pb2
+
+# Use the correct import path for TFX 1.15.0
+from tfx.proto import trainer_pb2
 from tfx.orchestration import pipeline
 from ml_metadata.proto import metadata_store_pb2
 
@@ -78,19 +79,22 @@ def create_pipeline(
             "epochs": config.TRAIN_EPOCHS,
             "project_id": project_id,
             "products_query": config.BQ_PRODUCTS_QUERY,
+            # GPU configuration for Vertex AI
+            "vertex_job_spec": {
+                "worker_pool_specs": [
+                    {
+                        "machine_spec": {
+                            "machine_type": "n1-standard-4",
+                            "accelerator_type": "NVIDIA_TESLA_T4",
+                            "accelerator_count": 1,
+                        },
+                        "replica_count": 1,
+                        "container_spec": {"image_uri": config.PIPELINE_IMAGE},
+                    }
+                ]
+            },
         },
     )
-
-    # To use GPUs on Vertex AI, we must specify the accelerator configuration
-    # in a platform-specific config for the Kubeflow v2 runner. This will
-    # instruct Vertex AI to run the Trainer component on a node with the
-    # specified GPU.
-    gpu_config = kubeflow_deployment_config_pb2.KubeflowDeploymentConfig(
-        accelerator=kubeflow_deployment_config_pb2.AcceleratorConfig(
-            type="NVIDIA_TESLA_T4", count=1
-        )
-    )
-    trainer.with_platform_config(gpu_config)
 
     # Set container image for all components when running on Vertex AI
     components = [
