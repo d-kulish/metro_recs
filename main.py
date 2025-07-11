@@ -4,6 +4,7 @@ from absl import app, flags, logging
 import tfx
 import os
 import tempfile
+import shutil
 
 from pipeline.pipeline import create_pipeline
 import config
@@ -29,9 +30,15 @@ def run_pipeline():
             default_image=config.PIPELINE_IMAGE,
         )
 
-        # Create a temporary directory for the pipeline JSON
-        with tempfile.TemporaryDirectory() as temp_dir:
+        # Create a temporary directory for the pipeline JSON with better error handling
+        temp_dir = None
+        try:
+            # Create temp directory with more permissive settings
+            temp_dir = tempfile.mkdtemp(prefix="tfx_pipeline_")
             pipeline_json_path = os.path.join(temp_dir, f"{config.PIPELINE_NAME}.json")
+
+            # Ensure the temp directory has proper permissions
+            os.chmod(temp_dir, 0o755)
 
             runner = kubeflow_v2_dag_runner.KubeflowV2DagRunner(
                 config=runner_config,
@@ -65,9 +72,17 @@ def run_pipeline():
                 f"Compiling pipeline '{config.PIPELINE_NAME}' with runner '{FLAGS.runner}'"
             )
             logging.info(f"Pipeline root: {config.PIPELINE_ROOT}")
+            logging.info(f"Temp directory: {temp_dir}")
 
-            # Compile the pipeline
-            runner.run(pipeline)
+            # Compile the pipeline with additional error handling
+            try:
+                runner.run(pipeline)
+            except Exception as e:
+                logging.error(f"Pipeline compilation failed: {e}")
+                # Try to clean up any partial files
+                if os.path.exists(pipeline_json_path):
+                    os.remove(pipeline_json_path)
+                raise
 
             # Now submit the compiled pipeline to Vertex AI
             logging.info("Submitting pipeline to Vertex AI...")
@@ -104,6 +119,17 @@ def run_pipeline():
                 logging.error(f"Failed to submit pipeline: {e}", exc_info=True)
                 raise e
 
+        finally:
+            # Clean up temporary directory
+            if temp_dir and os.path.exists(temp_dir):
+                try:
+                    shutil.rmtree(temp_dir)
+                    logging.info(f"Cleaned up temporary directory: {temp_dir}")
+                except Exception as e:
+                    logging.warning(
+                        f"Failed to clean up temp directory {temp_dir}: {e}"
+                    )
+
     else:
         from tfx.orchestration.local.local_dag_runner import LocalDagRunner
 
@@ -130,6 +156,22 @@ def run_pipeline():
 
 def main(_):
     logging.set_verbosity(logging.INFO)
+
+    # Set TensorFlow environment variables to avoid file I/O issues
+    os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "1")
+
+    # Ensure we have enough disk space by checking available space
+    import shutil as disk_util
+
+    total, used, free = disk_util.disk_usage("/")
+    free_gb = free // (1024**3)
+    logging.info(f"Available disk space: {free_gb} GB")
+
+    if free_gb < 5:  # Less than 5GB free
+        logging.warning(
+            f"Low disk space: {free_gb} GB available. This may cause file I/O issues."
+        )
+
     run_pipeline()
 
 

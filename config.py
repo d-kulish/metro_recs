@@ -107,7 +107,11 @@ JOIN TopProducts ON interactions.product_id = TopProducts.product_id
 VERTEX_PROJECT_ID = PROJECT_ID
 VERTEX_REGION = "europe-west4"
 PIPELINE_NAME = "metro-recommendations-pipeline-gpu"
-PIPELINE_ROOT = "gs://recs_metroua/pipeline_root"
+# Ensure pipeline root has a unique timestamp to avoid conflicts
+import datetime
+
+timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+PIPELINE_ROOT = f"gs://recs_metroua/pipeline_root/{timestamp}"
 
 # Dataflow settings for custom VPC. This is required if your project's network
 # is in custom subnet mode. Ask your GCP admin for the correct subnetwork name
