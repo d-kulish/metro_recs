@@ -9,6 +9,8 @@ tfx-bsl==1.16.0
 # TensorFlow stack - compatible with TFX 1.16.0
 tensorflow-transform==1.16.0
 tensorflow-recommenders==0.7.3
+# Pin Keras version to avoid conflicts
+keras==2.15.0
 
 # Apache Beam - use version compatible with TFX 1.16.0
 apache-beam[gcp]==2.53.0

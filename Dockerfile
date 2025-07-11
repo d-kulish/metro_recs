@@ -6,6 +6,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV CUDA_VISIBLE_DEVICES=0
 # Force TFX to use Vertex AI Training instead of AI Platform Training
 ENV TFX_USE_VERTEX_AI_TRAINING=true
+# Fix Keras version conflicts
+ENV KERAS_VERSION=2.15.0
 
 # Install Python 3.10 and system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -35,8 +37,9 @@ RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
 # Copy the requirements file
 COPY docker_requirements.txt .
 
-# Install TensorFlow GPU version that matches TFX 1.16.0
+# Install TensorFlow GPU version that matches TFX 1.16.0 with specific Keras version
 RUN python3.10 -m pip install --no-cache-dir tensorflow[and-cuda]==2.15.1
+RUN python3.10 -m pip install --no-cache-dir keras==2.15.0
 
 # Install remaining packages
 RUN python3.10 -m pip install --no-cache-dir \

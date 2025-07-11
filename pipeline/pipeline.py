@@ -122,39 +122,4 @@ def create_pipeline(
         pipeline_kwargs["metadata_connection_config"] = metadata_connection_config
 
     return pipeline.Pipeline(**pipeline_kwargs)
-    # Set container image for all components when running on Vertex AI
-    components = [
-        example_gen,
-        statistics_gen,
-        schema_gen,
-        transform,
-        trainer,
-    ]
 
-    # Set the Beam pipeline args for components that support it.
-    for component in components:
-        if hasattr(component, "with_beam_pipeline_args"):
-            component.with_beam_pipeline_args(
-                [
-                    f"--project={project_id}",
-                    f"--region={region}",
-                    "--runner=DataflowRunner",
-                    f"--temp_location={pipeline_root}/temp",
-                    f"--staging_location={pipeline_root}/staging",
-                    f"--service_account_email={service_account}",
-                    f"--subnetwork={subnetwork}",
-                    "--no_use_public_ips",
-                ]
-            )
-
-    pipeline_kwargs = {
-        "pipeline_name": pipeline_name,
-        "pipeline_root": pipeline_root,
-        "components": components,
-        "enable_cache": enable_cache,
-    }
-
-    if metadata_connection_config is not None:
-        pipeline_kwargs["metadata_connection_config"] = metadata_connection_config
-
-    return pipeline.Pipeline(**pipeline_kwargs)
