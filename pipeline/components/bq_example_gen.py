@@ -135,20 +135,24 @@ def create_bigquery_example_gen(
         ]
         final_beam_args.extend(beam_pipeline_args)
 
+    # Create a BeamExecutorSpec and add the pipeline arguments to it. This is the
+    # correct way to pass Beam args to a component with a custom executor that
+    # is not a subclass of BaseBeamComponent.
+    custom_executor = executor_spec.BeamExecutorSpec(
+        executor_class=BigQueryExampleGenExecutor
+    )
+    custom_executor.add_beam_pipeline_args(final_beam_args)
+
     component = FileBasedExampleGen(
         input_base="dummy",  # Not used for BigQuery
         custom_config={
             "query": query,
             "project_id": project_id,
-            # Add configuration for large-scale processing
             "large_scale_processing": True,
             "use_beam_sql": False,  # Use native BigQuery connector
         },
         output_config=output_config,
-        custom_executor_spec=executor_spec.ExecutorClassSpec(
-            BigQueryExampleGenExecutor
-        ),
-        beam_pipeline_args=final_beam_args,
+        custom_executor_spec=custom_executor,
     )
 
     return component
