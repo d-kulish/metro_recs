@@ -36,6 +36,9 @@ RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
     python3.10 get-pip.py && \
     rm get-pip.py
 
+# Install setuptools and wheel early to avoid distutils conflicts
+RUN python3.10 -m pip install --no-cache-dir setuptools==67.8.0 wheel==0.40.0
+
 # Copy requirements and install packages
 COPY docker_requirements.txt .
 

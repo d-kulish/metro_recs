@@ -181,21 +181,4 @@ def create_bigquery_example_gen(
     )
 
     return component
-    custom_executor.add_beam_pipeline_args(final_beam_args)
 
-    component = FileBasedExampleGen(
-        input_base="dummy",
-        custom_config={
-            "query": query,
-            "project_id": project_id,
-            "large_scale_processing": True,
-            "hybrid_architecture": True,
-            # Optimize for large datasets
-            "batch_size": 10000,
-            "use_avro_export": True,
-        },
-        output_config=output_config,
-        custom_executor_spec=custom_executor,
-    )
-
-    return component

@@ -1,5 +1,9 @@
 # Based on TFX 1.14.0 compatibility matrix - stable combination
 
+# Fix setuptools/distutils conflicts
+setuptools==67.8.0
+wheel==0.40.0
+
 # Core TFX stack with stable versions
 tfx==1.14.0
 kfp==1.8.22
