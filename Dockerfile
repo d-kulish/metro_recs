@@ -16,7 +16,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3.10-dev \
     python3.10-distutils \
     python3.10-venv \
-    python3-pip \
     build-essential \
     git \
     curl \
@@ -26,8 +25,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN ln -sf /usr/bin/python3.10 /usr/bin/python3
 RUN ln -sf /usr/bin/python3.10 /usr/bin/python
 
-# Update pip to latest version
-RUN python3.10 -m pip install --upgrade pip
+# Install pip for Python 3.10 directly using get-pip.py
+RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
+    python3.10 get-pip.py && \
+    rm get-pip.py
 
 # Copy the requirements file
 COPY docker_requirements.txt .
