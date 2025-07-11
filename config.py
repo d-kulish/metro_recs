@@ -125,6 +125,12 @@ IMAGE_NAME = "metro-recs-pipeline"
 # Use the actual image tag that matches your build process
 PIPELINE_IMAGE = f"{VERTEX_REGION}-docker.pkg.dev/{VERTEX_PROJECT_ID}/{AR_REPO}/{IMAGE_NAME}:latest-gpu"
 
+# Environment variables to fix protobuf compatibility issues
+PROTOBUF_ENV_VARS = {
+    "PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION": "python",
+    "TF_CPP_MIN_LOG_LEVEL": "1",
+}
+
 # Service account settings - use the Vertex AI service account or the current compute account
 # Option 1: Use the default Vertex AI service account (if it exists)
 # VERTEX_SERVICE_ACCOUNT = f"vertex-pipelines@{PROJECT_ID}.iam.gserviceaccount.com"

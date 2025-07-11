@@ -42,6 +42,9 @@ def create_pipeline(
             "--max_num_workers=30",
             "--worker_machine_type=n1-standard-4",
             "--use_execution_time_based_autoscaling=true",
+            # Add environment variables for protobuf compatibility
+            "--environment_type=DOCKER",
+            "--environment_config={'PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION': 'python'}",
         ],
     ).with_id("hybrid-bq-example-gen")
 
@@ -127,7 +130,7 @@ def create_pipeline(
         # The custom ExampleGen has its Beam args set during its creation and
         # does not support `with_beam_pipeline_args` when using a custom executor.
         # We skip it here to avoid an AttributeError.
-        if component.id == "custom-bq-interactions-gen":
+        if component.id == "hybrid-bq-example-gen":  # Fixed component ID
             continue
 
         if hasattr(component, "with_beam_pipeline_args"):
