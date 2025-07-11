@@ -15,7 +15,6 @@ from tensorflow.core.example.feature_pb2 import (
 
 from tfx.components.example_gen.base_example_gen_executor import BaseExampleGenExecutor
 from tfx.components.example_gen.component import FileBasedExampleGen
-from tfx.components.example_gen import utils
 from tfx.dsl.components.base import executor_spec
 from tfx.types import standard_artifacts
 
