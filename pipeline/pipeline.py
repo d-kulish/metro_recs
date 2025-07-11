@@ -77,23 +77,21 @@ def create_pipeline(
             "epochs": config.TRAIN_EPOCHS,
             "project_id": project_id,
             "products_query": config.BQ_PRODUCTS_QUERY,
-            # Configuration for the Vertex AI Training job
+            # Configuration for the AI Platform Training job (corrected format)
             "ai_platform_training_args": {
                 "project": project_id,
                 "region": region,
-                "worker_pool_specs": [{
-                    "machine_spec": {
-                        "machine_type": "n1-standard-4",
-                        "accelerator_type": "NVIDIA_TESLA_T4",
-                        "accelerator_count": 1,
+                "masterConfig": {
+                    "imageUri": config.PIPELINE_IMAGE,
+                    "acceleratorConfig": {
+                        "type": "NVIDIA_TESLA_T4",
+                        "count": 1,
                     },
-                    "replica_count": 1,
-                    "container_spec": {
-                        "image_uri": config.PIPELINE_IMAGE,
-                    },
-                }],
+                },
+                "scaleTier": "CUSTOM",
+                "masterType": "n1-standard-4",
             },
-        }
+        },
     )
 
     # Set container image for all components when running on Vertex AI
