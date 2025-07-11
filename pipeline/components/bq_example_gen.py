@@ -14,9 +14,6 @@ from tfx.components.example_gen.base_example_gen_executor import BaseExampleGenE
 from tfx.components.example_gen.component import FileBasedExampleGen
 from tfx.dsl.components.base import executor_spec
 
-# Import TFX's example utilities instead of direct TensorFlow
-from tfx.utils import example_gen_utils
-
 
 @beam.ptransform_fn
 @beam.typehints.with_input_types(beam.Pipeline)
@@ -42,48 +39,35 @@ def _BigQueryToExample(  # pylint: disable=invalid-name
         return formatted_row
 
     def row_to_example(formatted_row: Dict[str, Any]) -> bytes:
-        """Convert formatted row to serialized TF Example using TFX utilities."""
-        # Use TFX's example generation utilities to avoid TensorFlow imports
-        # This prevents protobuf conflicts in the Beam pipeline
+        """Convert formatted row to serialized TF Example."""
+        # Ensure protobuf compatibility
+        os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 
-        # Create feature dictionary in the format expected by TFX
-        features = {}
-
-        # String features
-        for key in ["cust_person_id", "product_id", "city", "date_of_day"]:
-            value = formatted_row.get(key, "")
-            features[key] = {"bytes_list": {"value": [value.encode("utf-8")]}}
-
-        # Float features
-        for key in ["sell_val_nsp", "total_revenue"]:
-            value = float(formatted_row.get(key, 0.0))
-            features[key] = {"float_list": {"value": [value]}}
-
-        # Create example dictionary
-        example_dict = {"features": {"feature": features}}
-
-        # Use TFX utilities to create the serialized example
-        # This avoids direct TensorFlow imports in the Beam pipeline
+        # Use a direct approach with TensorFlow train module
+        # This avoids complex protobuf imports that cause conflicts
         try:
-            from tensorflow_metadata.proto.v0 import example_pb2
+            # Import only what we need from TensorFlow
+            from tensorflow.python.training import example_pb2
 
+            # Create the example using the lower-level protobuf API
             example = example_pb2.Example()
 
-            # Manually populate the example to avoid TensorFlow imports
-            for feature_name, feature_value in features.items():
-                if "bytes_list" in feature_value:
-                    example.features.feature[feature_name].bytes_list.value.extend(
-                        feature_value["bytes_list"]["value"]
-                    )
-                elif "float_list" in feature_value:
-                    example.features.feature[feature_name].float_list.value.extend(
-                        feature_value["float_list"]["value"]
-                    )
+            # Add string features
+            for key in ["cust_person_id", "product_id", "city", "date_of_day"]:
+                value = formatted_row.get(key, "")
+                example.features.feature[key].bytes_list.value.append(
+                    value.encode("utf-8")
+                )
+
+            # Add float features
+            for key in ["sell_val_nsp", "total_revenue"]:
+                value = float(formatted_row.get(key, 0.0))
+                example.features.feature[key].float_list.value.append(value)
 
             return example.SerializeToString()
+
         except ImportError:
-            # Fallback: Use TensorFlow if tensorflow_metadata is not available
-            # This should only happen in development environments
+            # Fallback to standard TensorFlow if training module is not available
             import tensorflow as tf
 
             feature_dict = {}
@@ -179,6 +163,24 @@ def create_bigquery_example_gen(
     custom_executor = executor_spec.BeamExecutorSpec(
         executor_class=BigQueryExampleGenExecutor
     )
+    custom_executor.add_beam_pipeline_args(final_beam_args)
+
+    component = FileBasedExampleGen(
+        input_base="dummy",
+        custom_config={
+            "query": query,
+            "project_id": project_id,
+            "large_scale_processing": True,
+            "hybrid_architecture": True,
+            # Optimize for large datasets
+            "batch_size": 10000,
+            "use_avro_export": True,
+        },
+        output_config=output_config,
+        custom_executor_spec=custom_executor,
+    )
+
+    return component
     custom_executor.add_beam_pipeline_args(final_beam_args)
 
     component = FileBasedExampleGen(
