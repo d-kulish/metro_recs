@@ -72,14 +72,14 @@ def create_pipeline(
             "epochs": config.TRAIN_EPOCHS,
             "project_id": project_id,
             "products_query": config.BQ_PRODUCTS_QUERY,
-            # Vertex AI Training job configuration with correct field names
+            # Vertex AI Training job configuration with correct camelCase field names
             "ai_platform_training_args": {
                 "project": project_id,
                 "region": region,
                 "jobDir": f"{pipeline_root}/training_jobs",
                 "masterConfig": {
                     "imageUri": config.PIPELINE_IMAGE,
-                    "machine_type": config.GPU_MACHINE_TYPE,
+                    "machineType": config.GPU_MACHINE_TYPE,
                     "acceleratorConfig": {
                         "type": config.GPU_ACCELERATOR_TYPE,
                         "count": config.GPU_ACCELERATOR_COUNT,
@@ -90,7 +90,7 @@ def create_pipeline(
                     {
                         "workerConfig": {
                             "imageUri": config.PIPELINE_IMAGE,
-                            "machine_type": config.GPU_MACHINE_TYPE,
+                            "machineType": config.GPU_MACHINE_TYPE,
                             "acceleratorConfig": {
                                 "type": config.GPU_ACCELERATOR_TYPE,
                                 "count": config.GPU_ACCELERATOR_COUNT,
@@ -106,7 +106,7 @@ def create_pipeline(
                     {
                         "parameterServerConfig": {
                             "imageUri": config.PIPELINE_IMAGE,
-                            "machine_type": "n1-standard-4",
+                            "machineType": "n1-standard-4",
                         },
                         "parameterServerCount": config.PARAMETER_SERVER_COUNT,
                     }
