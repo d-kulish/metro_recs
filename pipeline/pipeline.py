@@ -78,18 +78,17 @@ def create_pipeline(
         },
     )
 
-    # Configure GPU resources for the trainer component
-    trainer.platform_config = {
-        "vertex": {
-            "task_spec": {
-                "machine_spec": {
-                    "machine_type": "n1-standard-4",
-                    "accelerator_type": "NVIDIA_TESLA_T4",
-                    "accelerator_count": 1,
-                },
-            }
-        }
-    }
+    # Configure GPU resources for the trainer component using ResourceSpec
+    from tfx.proto.orchestration import pipeline_pb2
+
+    trainer.platform_config = pipeline_pb2.PlatformConfig(
+        resource_spec=pipeline_pb2.ResourceSpec(
+            cpu_limit=4.0,
+            memory_limit=15.0,  # 15 GB
+            accelerator_type="NVIDIA_TESLA_T4",
+            accelerator_count=1,
+        )
+    )
 
     # Set container image for all components when running on Vertex AI
     components = [
@@ -131,4 +130,5 @@ def create_pipeline(
     if metadata_connection_config is not None:
         pipeline_kwargs["metadata_connection_config"] = metadata_connection_config
 
+    return pipeline.Pipeline(**pipeline_kwargs)
     return pipeline.Pipeline(**pipeline_kwargs)
