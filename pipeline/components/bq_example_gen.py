@@ -91,33 +91,29 @@ def create_bigquery_example_gen(
     output_config: Optional[Dict[str, Any]] = None,
     beam_pipeline_args: Optional[list] = None,
 ) -> FileBasedExampleGen:
-    """Creates a BigQuery ExampleGen component optimized for large datasets.
+    """Creates a BigQuery ExampleGen component optimized for large datasets."""
 
-    Args:
-        query: SQL query to execute
-        project_id: GCP project ID
-        output_config: Optional output configuration
-        beam_pipeline_args: Optional Beam pipeline arguments for scaling
-
-    Returns:
-        FileBasedExampleGen component configured for large-scale processing
-    """
-    # Default beam args for large-scale processing
+    # Optimized beam args for large-scale processing
     default_beam_args = [
         "--runner=DataflowRunner",
         f"--project={project_id}",
         "--region=europe-west4",
         "--temp_location=gs://recs_metroua/dataflow_temp",
         "--staging_location=gs://recs_metroua/dataflow_staging",
-        "--num_workers=10",  # Start with 10 workers
-        "--max_num_workers=50",  # Scale up to 50 workers for large data
+        "--num_workers=10",
+        "--max_num_workers=30",  # Reduced for stability
         "--worker_machine_type=n1-standard-4",
         "--disk_size_gb=100",
         "--use_public_ips=false",
-        # Performance optimizations
+        # Performance optimizations for large data
         "--experiments=use_runner_v2",
         "--experiments=use_unified_worker",
         "--experiments=shuffle_mode=service",
+        "--experiments=use_monitoring_state_manager",
+        "--experiments=enable_prime_watermark_optimization",
+        # Memory optimization
+        "--worker_memory_mb=15000",
+        "--use_execution_time_based_autoscaling=true",
     ]
 
     # Merge with provided beam args
@@ -141,15 +137,19 @@ def create_bigquery_example_gen(
     custom_executor.add_beam_pipeline_args(final_beam_args)
 
     component = FileBasedExampleGen(
-        input_base="dummy",  # Not used for BigQuery
+        input_base="dummy",
         custom_config={
             "query": query,
             "project_id": project_id,
             "large_scale_processing": True,
-            "use_beam_sql": False,  # Use native BigQuery connector
+            "hybrid_architecture": True,
+            # Optimize for large datasets
+            "batch_size": 10000,
+            "use_avro_export": True,
         },
         output_config=output_config,
         custom_executor_spec=custom_executor,
     )
 
+    return component
     return component

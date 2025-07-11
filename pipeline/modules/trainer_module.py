@@ -160,7 +160,7 @@ def _build_product_model(
 
 
 def run_fn(fn_args: tfx.components.FnArgs):
-    """Main training function called by TFX Trainer."""
+    """Main training function optimized for hybrid architecture."""
     # Extract batch size and learning rate from training_args
     batch_size = 4096  # default
     learning_rate = 0.1  # default
@@ -172,42 +172,44 @@ def run_fn(fn_args: tfx.components.FnArgs):
         elif arg.startswith("--learning-rate="):
             learning_rate = float(arg.split("=")[1])
 
-    # Check if distributed training is enabled from training_args
-    is_distributed = any("--distributed-training=True" in arg for arg in training_args)
-
-    # Configure distributed training strategy
+    # Configure GPU strategy for hybrid architecture
     strategy = None
-    if is_distributed:
-        # Use MultiWorkerMirroredStrategy for distributed training
-        strategy = tf.distribute.MultiWorkerMirroredStrategy()
-        logging.info("Using MultiWorkerMirroredStrategy for distributed training")
+    gpus = tf.config.list_physical_devices("GPU")
+
+    if gpus:
+        try:
+            # Configure GPU memory growth
+            for gpu in gpus:
+                tf.config.experimental.set_memory_growth(gpu, True)
+
+            # Use appropriate strategy based on GPU count
+            if len(gpus) > 1:
+                strategy = tf.distribute.MirroredStrategy()
+                logging.info(f"Using MirroredStrategy with {len(gpus)} GPUs")
+            else:
+                # Single GPU - no strategy needed, just configure properly
+                logging.info("Using single GPU for training")
+
+            # Enable mixed precision for better performance
+            tf.keras.mixed_precision.set_global_policy("mixed_float16")
+            logging.info("Mixed precision enabled")
+
+        except RuntimeError as e:
+            logging.error(f"GPU configuration failed: {e}")
+            strategy = None
     else:
-        # Configure GPU usage for single machine
-        gpus = tf.config.list_physical_devices("GPU")
-        if gpus:
-            try:
-                # Enable memory growth to prevent TensorFlow from allocating all GPU memory
-                for gpu in gpus:
-                    tf.config.experimental.set_memory_growth(gpu, True)
+        logging.warning("No GPUs available - using CPU")
 
-                # Use MirroredStrategy for multi-GPU on single machine
-                if len(gpus) > 1:
-                    strategy = tf.distribute.MirroredStrategy()
-                    logging.info(f"Using MirroredStrategy with {len(gpus)} GPUs")
-                else:
-                    logging.info("Using single GPU")
+    # Log GPU configuration
+    logging.info(f"Available GPUs: {len(gpus)}")
+    logging.info(f"CUDA available: {tf.test.is_built_with_cuda()}")
 
-                # Enable mixed precision for better GPU performance
-                tf.keras.mixed_precision.set_global_policy("mixed_float16")
-                logging.info("Mixed precision enabled for better GPU performance")
-            except RuntimeError as e:
-                logging.error(f"GPU configuration error: {e}")
-        else:
-            logging.warning("No GPUs detected. Training will run on CPU.")
-
-    # Verify GPU availability with updated API
-    logging.info(f"GPUs available: {tf.config.list_physical_devices('GPU')}")
-    logging.info(f"Built with CUDA: {tf.test.is_built_with_cuda()}")
+    # Check if running in hybrid architecture mode
+    is_hybrid = fn_args.custom_config.get("hybrid_architecture", False)
+    if is_hybrid:
+        logging.info("Running in hybrid architecture mode")
+        # Optimize for hybrid processing
+        batch_size = min(batch_size, 8192)  # Prevent memory issues
 
     tf_transform_output = tft.TFTransformOutput(fn_args.transform_output)
     tft_layer = tf_transform_output.transform_features_layer()
@@ -220,22 +222,22 @@ def run_fn(fn_args: tfx.components.FnArgs):
         fn_args.eval_files, fn_args.data_accessor, tf_transform_output, batch_size
     )
 
-    # Build model within strategy scope for distributed training
-    with strategy.scope() if strategy else tf.name_scope("model"):
+    # Build model with proper GPU configuration
+    model_scope = strategy.scope() if strategy else tf.name_scope("model")
+    with model_scope:
         model = MetroRecommendationModel(
             user_model=_build_user_model(tf_transform_output),
             product_model=_build_product_model(tf_transform_output),
         )
 
-        # Configure optimizer for distributed training
+        # Configure optimizer for GPU training
         optimizer = tf.keras.optimizers.Adagrad(learning_rate=learning_rate)
 
-        # Use mixed precision optimizer if GPUs are available
-        if tf.config.list_physical_devices("GPU"):
+        # Use mixed precision optimizer if available
+        if gpus and tf.keras.mixed_precision.global_policy().name == "mixed_float16":
             optimizer = tf.keras.mixed_precision.LossScaleOptimizer(optimizer)
-            logging.info("Using mixed precision optimizer for GPU training")
+            logging.info("Using mixed precision optimizer")
 
-        # Compile with the configured optimizer
         model.compile(optimizer=optimizer)
 
     # Configure callbacks for distributed training
@@ -293,14 +295,20 @@ def run_fn(fn_args: tfx.components.FnArgs):
             f"Distributed training enabled with strategy: {type(strategy).__name__}"
         )
 
-    model.fit(
-        train_dataset,
-        epochs=fn_args.custom_config.get("epochs", 5),
-        steps_per_epoch=fn_args.train_steps,
-        validation_data=eval_dataset,
-        validation_steps=fn_args.eval_steps,
-        callbacks=callbacks,
-    )
+    # Configure training based on architecture
+    fit_kwargs = {
+        "epochs": fn_args.custom_config.get("epochs", 5),
+        "steps_per_epoch": fn_args.train_steps,
+        "validation_data": eval_dataset,
+        "validation_steps": fn_args.eval_steps,
+        "callbacks": callbacks,
+    }
+
+    # Add verbose logging for GPU training
+    if gpus:
+        fit_kwargs["verbose"] = 2  # Progress bar per epoch
+
+    model.fit(train_dataset, **fit_kwargs)
 
     # Create and save retrieval index
     index = tfrs.layers.factorized_top_k.BruteForce(model.user_model)

@@ -1,14 +1,13 @@
-# Alternative: Use Ubuntu base image and install CUDA manually
+# Use Ubuntu 20.04 with Python 3.10 for TensorFlow 2.13.1 compatibility
 FROM ubuntu:20.04
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
 ENV CUDA_VISIBLE_DEVICES=0
-# Force TFX to use Vertex AI Training instead of AI Platform Training
+# Use TFX 1.14.0 with Vertex AI Training (no longer AI Platform)
 ENV TFX_USE_VERTEX_AI_TRAINING=true
-# Fix Keras version conflicts - force TF to use Keras 2
+# Force TensorFlow to use Keras 2.13.1 (stable combination)
 ENV TF_USE_LEGACY_KERAS=1
-ENV KERAS_VERSION=2.15.0
 
 # Install Python 3.10 and system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -30,23 +29,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN ln -sf /usr/bin/python3.10 /usr/bin/python3
 RUN ln -sf /usr/bin/python3.10 /usr/bin/python
 
-# Install pip for Python 3.10 directly using get-pip.py
+# Install pip for Python 3.10
 RUN curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
     python3.10 get-pip.py && \
     rm get-pip.py
 
-# Copy the requirements file
+# Copy requirements and install packages
 COPY docker_requirements.txt .
 
-# Install TensorFlow GPU version with explicit Keras configuration
-RUN python3.10 -m pip install --no-cache-dir tensorflow[and-cuda]==2.15.1
-# Force reinstall of compatible Keras version
-RUN python3.10 -m pip install --no-cache-dir --force-reinstall keras==2.15.0
+# Install stable TensorFlow 2.13.1 with GPU support
+RUN python3.10 -m pip install --no-cache-dir tensorflow[and-cuda]==2.13.1
 
-# Install remaining packages
+# Install remaining packages with legacy resolver for compatibility
 RUN python3.10 -m pip install --no-cache-dir \
     --use-deprecated=legacy-resolver \
     -r docker_requirements.txt
 
-# Clean up build dependencies
+# Clean up
 RUN apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/*

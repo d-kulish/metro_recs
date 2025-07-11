@@ -1,25 +1,24 @@
-# Based on TFX 1.16.0 compatibility matrix - corrected versions
+# Based on TFX 1.14.0 compatibility matrix - stable combination
 
-# Core TFX stack with correct latest stable versions
-tfx==1.16.0
-kfp==2.8.0
-ml-metadata==1.16.0
-tfx-bsl==1.16.0
+# Core TFX stack with stable versions
+tfx==1.14.0
+kfp==1.8.22
+ml-metadata==1.14.0
+tfx-bsl==1.14.0
 
-# TensorFlow stack - compatible with TFX 1.16.0
-tensorflow-transform==1.16.0
+# TensorFlow stack - stable combination
+tensorflow==2.13.1
+tensorflow-transform==1.14.0
 tensorflow-recommenders==0.7.3
-# Pin Keras version to avoid conflicts and force TF to use Keras 2
-keras==2.15.0
-tf-keras==2.15.0
+keras==2.13.1
 
-# Apache Beam - use version compatible with TFX 1.16.0
-apache-beam[gcp]==2.53.0
+# Apache Beam - compatible with TFX 1.14.0
+apache-beam[gcp]==2.50.0
 
-# Google Cloud libraries - use compatible versions
+# Google Cloud libraries - compatible versions
 google-cloud-bigquery==3.11.4
 google-cloud-storage==2.10.0
-google-cloud-aiplatform==1.36.0
+google-cloud-aiplatform==1.34.0
 
 # BigQuery pandas integration
 db-dtypes==1.1.1
@@ -35,16 +34,16 @@ google-api-core==2.11.1
 # GPU monitoring (optional)
 nvidia-ml-py3==7.352.0
 
-# Core dependencies - compatible with TFX 1.16.0
-grpcio==1.60.1
-grpcio-status==1.60.1
-protobuf==4.25.1
+# Core dependencies - compatible with TFX 1.14.0
+grpcio==1.57.0
+grpcio-status==1.57.0
+protobuf==4.23.4
 absl-py==1.4.0
-googleapis-common-protos==1.61.0
+googleapis-common-protos==1.59.1
 
 # Additional dependencies for Google Cloud integration
 google-cloud-core==2.3.3
 cachetools==5.3.1
 
 # Ensure TFX GCP extensions are included
-tfx[gcp]==1.16.0
+tfx[gcp]==1.14.0

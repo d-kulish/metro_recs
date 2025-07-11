@@ -22,17 +22,28 @@ def create_pipeline(
     enable_cache: bool = True,
     metadata_connection_config: Optional[metadata_store_pb2.ConnectionConfig] = None,
 ) -> pipeline.Pipeline:
-    """Create TFX pipeline for Metro recommendations."""
+    """Create TFX pipeline optimized for hybrid architecture."""
 
-    # Use GCS paths for modules to avoid local file packaging issues
+    # Use GCS paths for modules
     transform_module_path = f"{pipeline_root}/modules/transform_module.py"
     trainer_module_path = f"{pipeline_root}/modules/trainer_module.py"
 
-    # Data ingestion using the custom BigQueryExampleGen for large-scale processing
+    # Data ingestion - optimized for large-scale CPU processing
     example_gen = create_bigquery_example_gen(
         query=query,
         project_id=project_id,
-    ).with_id("custom-bq-interactions-gen")
+        beam_pipeline_args=[
+            f"--project={project_id}",
+            f"--region={region}",
+            f"--service_account_email={service_account}",
+            f"--subnetwork={subnetwork}",
+            # Large-scale processing optimizations
+            "--num_workers=10",
+            "--max_num_workers=30",
+            "--worker_machine_type=n1-standard-4",
+            "--use_execution_time_based_autoscaling=true",
+        ],
+    ).with_id("hybrid-bq-example-gen")
 
     # Generate statistics
     statistics_gen = tfx.components.StatisticsGen(
@@ -51,7 +62,7 @@ def create_pipeline(
         module_file=transform_module_path,
     )
 
-    # Model training - use GCS path
+    # Model training - GPU-optimized configuration
     trainer = tfx.components.Trainer(
         module_file=trainer_module_path,
         examples=transform.outputs["transformed_examples"],
@@ -63,27 +74,24 @@ def create_pipeline(
             "epochs": config.TRAIN_EPOCHS,
             "project_id": project_id,
             "products_query": config.BQ_PRODUCTS_QUERY,
-            # Training arguments
+            "hybrid_architecture": True,
             "training_args": [
-                f"--distributed-training={config.ENABLE_DISTRIBUTED_TRAINING}",
                 f"--batch-size={config.BATCH_SIZE}",
                 f"--learning-rate={config.LEARNING_RATE}",
+                f"--distributed-training={config.ENABLE_DISTRIBUTED_TRAINING}",
             ],
-            # Force GPU configuration
-            "ai_platform_training_args": {
+            # Vertex AI Training configuration (replaces AI Platform)
+            "vertex_training_args": {
                 "project": project_id,
                 "region": region,
-                "runtimeVersion": "2.15",
-                "pythonVersion": "3.10",
-                "jobDir": f"{pipeline_root}/training_jobs",
-                "masterConfig": {
-                    "imageUri": config.PIPELINE_IMAGE,
-                    "machineType": config.GPU_MACHINE_TYPE,
-                    "acceleratorConfig": {
-                        "type": config.GPU_ACCELERATOR_TYPE,
-                        "count": config.GPU_ACCELERATOR_COUNT,
-                    },
-                },
+                "display_name": f"{config.PIPELINE_NAME}-training",
+                "container_image_uri": config.PIPELINE_IMAGE,
+                "machine_type": config.GPU_MACHINE_TYPE,
+                "accelerator_type": config.GPU_ACCELERATOR_TYPE,
+                "accelerator_count": config.GPU_ACCELERATOR_COUNT,
+                "boot_disk_size_gb": 100,
+                "enable_web_access": False,
+                "service_account": service_account,
             },
         },
     )
@@ -97,6 +105,23 @@ def create_pipeline(
         trainer,
     ]
 
+    # Optimize Dataflow settings for data processing components
+    dataflow_beam_args = [
+        f"--project={project_id}",
+        f"--region={region}",
+        "--runner=DataflowRunner",
+        f"--temp_location={pipeline_root}/dataflow_temp",
+        f"--staging_location={pipeline_root}/dataflow_staging",
+        f"--service_account_email={service_account}",
+        f"--subnetwork={subnetwork}",
+        "--no_use_public_ips",
+        # Optimizations for large data processing
+        "--num_workers=5",
+        "--max_num_workers=20",
+        "--worker_machine_type=n1-standard-2",
+        "--use_execution_time_based_autoscaling=true",
+    ]
+
     # Set the Beam pipeline args for components that support it.
     for component in components:
         # The custom ExampleGen has its Beam args set during its creation and
@@ -106,18 +131,7 @@ def create_pipeline(
             continue
 
         if hasattr(component, "with_beam_pipeline_args"):
-            component.with_beam_pipeline_args(
-                [
-                    f"--project={project_id}",
-                    f"--region={region}",
-                    "--runner=DataflowRunner",
-                    f"--temp_location={pipeline_root}/temp",
-                    f"--staging_location={pipeline_root}/staging",
-                    f"--service_account_email={service_account}",
-                    f"--subnetwork={subnetwork}",
-                    "--no_use_public_ips",
-                ]
-            )
+            component.with_beam_pipeline_args(dataflow_beam_args)
 
     pipeline_kwargs = {
         "pipeline_name": pipeline_name,

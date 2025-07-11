@@ -106,7 +106,7 @@ JOIN TopProducts ON interactions.product_id = TopProducts.product_id
 # Vertex AI settings
 VERTEX_PROJECT_ID = PROJECT_ID
 VERTEX_REGION = "europe-west4"
-PIPELINE_NAME = "metro-recommendations-pipeline-gpu"
+PIPELINE_NAME = "metro-recommendations-pipeline-hybrid"
 # Ensure pipeline root has a unique timestamp to avoid conflicts
 import datetime
 
@@ -122,7 +122,10 @@ DATAFLOW_SUBNETWORK = "regions/europe-west4/subnetworks/default"
 # You must build and push this image to your project's Artifact Registry.
 AR_REPO = "metro-recs-repo"  # The name of your Artifact Registry repository
 IMAGE_NAME = "metro-recs-pipeline"
-PIPELINE_IMAGE = f"{VERTEX_REGION}-docker.pkg.dev/{VERTEX_PROJECT_ID}/{AR_REPO}/{IMAGE_NAME}:latest-gpu"
+# Use updated Docker image tag for stable version
+PIPELINE_IMAGE = (
+    f"{VERTEX_REGION}-docker.pkg.dev/{VERTEX_PROJECT_ID}/{AR_REPO}/{IMAGE_NAME}:stable"
+)
 
 # Service account settings - use the Vertex AI service account or the current compute account
 # Option 1: Use the default Vertex AI service account (if it exists)
@@ -131,48 +134,59 @@ PIPELINE_IMAGE = f"{VERTEX_REGION}-docker.pkg.dev/{VERTEX_PROJECT_ID}/{AR_REPO}/
 # Option 2: Use the current compute service account (needs proper roles)
 VERTEX_SERVICE_ACCOUNT = "1032729337493-compute@developer.gserviceaccount.com"
 
-# Model settings - Updated for GPU training and scaling
+# Model settings - Optimized for hybrid architecture
 EMBEDDING_DIMENSION = 32
 TRAIN_EPOCHS = 5
-TRAIN_STEPS = 1000  # Increased for better GPU utilization
-EVAL_STEPS = 50  # Increased for better evaluation
-BATCH_SIZE = 8192  # Larger batch size for GPU efficiency
+TRAIN_STEPS = 1000
+EVAL_STEPS = 50
+BATCH_SIZE = 4096  # Reduced for stable training
 LEARNING_RATE = 0.1
 
-# GPU Training Configuration - Updated for modern Vertex AI
+# GPU Training Configuration - Use modern GPU types
 GPU_MACHINE_TYPE = "n1-standard-4"
 GPU_ACCELERATOR_TYPE = "NVIDIA_TESLA_T4"
 GPU_ACCELERATOR_COUNT = 1
 
-# Distributed Training Configuration
-ENABLE_DISTRIBUTED_TRAINING = False
-WORKER_COUNT = 0  # 0 means no workers (single machine training)
-PARAMETER_SERVER_COUNT = 0  # 0 means no parameter servers
+# Hybrid Architecture Settings
+HYBRID_CONFIG = {
+    "data_processing": {
+        "use_dataflow": True,
+        "dataflow_workers": 10,
+        "dataflow_max_workers": 30,
+        "dataflow_machine_type": "n1-standard-4",
+        "dataflow_disk_size": 100,
+    },
+    "training": {
+        "use_vertex_training": True,
+        "gpu_enabled": True,
+        "machine_type": GPU_MACHINE_TYPE,
+        "accelerator_type": GPU_ACCELERATOR_TYPE,
+        "accelerator_count": GPU_ACCELERATOR_COUNT,
+    },
+}
 
 # Scaling Configuration for 20-30x data increase
 # Updated with modern GPU types and proper machine types
 SCALING_CONFIG = {
     "large_dataset": {
+        "dataflow_workers": 20,
+        "dataflow_max_workers": 50,
         "GPU_MACHINE_TYPE": "n1-standard-8",
         "GPU_ACCELERATOR_TYPE": "NVIDIA_TESLA_T4",
         "GPU_ACCELERATOR_COUNT": 1,
-        "BATCH_SIZE": 16384,
+        "BATCH_SIZE": 8192,
         "TRAIN_STEPS": 2000,
         "EVAL_STEPS": 100,
-        "ENABLE_DISTRIBUTED_TRAINING": False,
-        "WORKER_COUNT": 0,
-        "PARAMETER_SERVER_COUNT": 0,
     },
     "extra_large_dataset": {
+        "dataflow_workers": 30,
+        "dataflow_max_workers": 100,
         "GPU_MACHINE_TYPE": "n1-standard-16",
         "GPU_ACCELERATOR_TYPE": "NVIDIA_TESLA_V100",
-        "GPU_ACCELERATOR_COUNT": 1,
-        "BATCH_SIZE": 32768,
+        "GPU_ACCELERATOR_COUNT": 2,
+        "BATCH_SIZE": 16384,
         "TRAIN_STEPS": 3000,
         "EVAL_STEPS": 150,
-        "ENABLE_DISTRIBUTED_TRAINING": False,
-        "WORKER_COUNT": 0,
-        "PARAMETER_SERVER_COUNT": 0,
     },
 }
 
