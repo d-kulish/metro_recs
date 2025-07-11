@@ -61,7 +61,7 @@ def create_pipeline(
     )
 
     # Model training with GPU support using Vertex AI Training
-    # Use the standard Trainer component with Vertex AI custom job configuration
+    # Use the standard Trainer component with corrected AI Platform configuration
     trainer = tfx.components.Trainer(
         module_file=os.path.abspath("pipeline/modules/trainer_module.py"),
         examples=transform.outputs["transformed_examples"],
@@ -73,30 +73,23 @@ def create_pipeline(
             "epochs": config.TRAIN_EPOCHS,
             "project_id": project_id,
             "products_query": config.BQ_PRODUCTS_QUERY,
-            # Vertex AI custom job configuration for GPU training
-            "vertex_job_spec": {
+            # Use corrected AI Platform Training configuration
+            "ai_platform_training_args": {
                 "project": project_id,
-                "location": region,
-                "display_name": f"{pipeline_name}-training",
-                "job_spec": {
-                    "worker_pool_specs": [
-                        {
-                            "machine_spec": {
-                                "machine_type": config.GPU_MACHINE_TYPE,
-                                "accelerator_type": config.GPU_ACCELERATOR_TYPE,
-                                "accelerator_count": config.GPU_ACCELERATOR_COUNT,
-                            },
-                            "replica_count": 1,
-                            "container_spec": {
-                                "image_uri": config.PIPELINE_IMAGE,
-                                "args": [
-                                    f"--distributed-training={config.ENABLE_DISTRIBUTED_TRAINING}",
-                                    f"--batch-size={config.BATCH_SIZE}",
-                                    f"--learning-rate={config.LEARNING_RATE}",
-                                ],
-                            },
-                        }
-                    ],
+                "region": region,
+                "jobDir": f"{pipeline_root}/training_jobs",
+                "args": [
+                    f"--distributed-training={config.ENABLE_DISTRIBUTED_TRAINING}",
+                    f"--batch-size={config.BATCH_SIZE}",
+                    f"--learning-rate={config.LEARNING_RATE}",
+                ],
+                "masterConfig": {
+                    "imageUri": config.PIPELINE_IMAGE,
+                    "machineType": config.GPU_MACHINE_TYPE,  # Changed from machine_type
+                    "acceleratorConfig": {
+                        "type": config.GPU_ACCELERATOR_TYPE,
+                        "count": config.GPU_ACCELERATOR_COUNT,
+                    },
                 },
             },
         },

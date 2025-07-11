@@ -4,6 +4,8 @@ FROM ubuntu:20.04
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
 ENV CUDA_VISIBLE_DEVICES=0
+# Force TFX to use Vertex AI Training instead of AI Platform Training
+ENV TFX_USE_VERTEX_AI_TRAINING=true
 
 # Install Python 3.10 and system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
