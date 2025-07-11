@@ -16,9 +16,11 @@ from google.cloud import bigquery
 # problematic cross-module imports in the TFX execution environment.
 LABEL_KEY = "sell_val_nsp"
 
+
 def transformed_name(key):
     """Generate transformed feature name."""
     return key + "_xf"
+
 
 EMBEDDING_DIMENSION = 32
 
@@ -79,12 +81,26 @@ def _build_user_model(
 ) -> tf.keras.Model:
     """Builds the user model tower with multiple features."""
     inputs = {
-        transformed_name("cust_person_id"): tf.keras.Input(shape=(1,), name=transformed_name("cust_person_id"), dtype=tf.int64),
-        transformed_name("city"): tf.keras.Input(shape=(1,), name=transformed_name("city"), dtype=tf.int64),
-        transformed_name("month"): tf.keras.Input(shape=(1,), name=transformed_name("month"), dtype=tf.int64),
-        transformed_name("day_of_month"): tf.keras.Input(shape=(1,), name=transformed_name("day_of_month"), dtype=tf.int64),
-        transformed_name("total_revenue_bucket"): tf.keras.Input(shape=(1,), name=transformed_name("total_revenue_bucket"), dtype=tf.int64),
-        transformed_name("total_revenue_normalized"): tf.keras.Input(shape=(1,), name=transformed_name("total_revenue_normalized"), dtype=tf.float32),
+        transformed_name("cust_person_id"): tf.keras.Input(
+            shape=(1,), name=transformed_name("cust_person_id"), dtype=tf.int64
+        ),
+        transformed_name("city"): tf.keras.Input(
+            shape=(1,), name=transformed_name("city"), dtype=tf.int64
+        ),
+        transformed_name("month"): tf.keras.Input(
+            shape=(1,), name=transformed_name("month"), dtype=tf.int64
+        ),
+        transformed_name("day_of_month"): tf.keras.Input(
+            shape=(1,), name=transformed_name("day_of_month"), dtype=tf.int64
+        ),
+        transformed_name("total_revenue_bucket"): tf.keras.Input(
+            shape=(1,), name=transformed_name("total_revenue_bucket"), dtype=tf.int64
+        ),
+        transformed_name("total_revenue_normalized"): tf.keras.Input(
+            shape=(1,),
+            name=transformed_name("total_revenue_normalized"),
+            dtype=tf.float32,
+        ),
     }
 
     embeddings = []
@@ -99,9 +115,15 @@ def _build_user_model(
     ]:
         # The input_dim must be vocab_size + num_oov_buckets. In our transform, num_oov_buckets is 1.
         # This fixes the "index out of bounds" error.
-        vocab_size = (num_buckets + 1) if num_buckets else (tf_transform_output.vocabulary_size_by_name(vocab_name) + 1)
+        vocab_size = (
+            (num_buckets + 1)
+            if num_buckets
+            else (tf_transform_output.vocabulary_size_by_name(vocab_name) + 1)
+        )
         embedding_layer = tf.keras.layers.Embedding(
-            input_dim=vocab_size, output_dim=EMBEDDING_DIMENSION, name=f"embedding_{key}"
+            input_dim=vocab_size,
+            output_dim=EMBEDDING_DIMENSION,
+            name=f"embedding_{key}",
         )
         embeddings.append(tf.keras.layers.Flatten()(embedding_layer(inputs[key])))
 
@@ -110,30 +132,39 @@ def _build_user_model(
 
     # Concatenate all features and build dense layers for the final embedding
     concatenated_features = tf.keras.layers.concatenate(embeddings)
-    dense_output = tf.keras.layers.Dense(64, activation="relu")(
-        concatenated_features
-    )
+    dense_output = tf.keras.layers.Dense(64, activation="relu")(concatenated_features)
     dense_output = tf.keras.layers.Dense(EMBEDDING_DIMENSION)(dense_output)
 
     return tf.keras.Model(inputs=inputs, outputs=dense_output)
+
 
 def _build_product_model(
     tf_transform_output: tft.TFTransformOutput,
 ) -> tf.keras.Model:
     """Builds the product model tower."""
     # The input_dim must be vocab_size + num_oov_buckets. In our transform, num_oov_buckets is 1.
-    vocab_size = tf_transform_output.vocabulary_size_by_name("vocabulary_product_id") + 1
+    vocab_size = (
+        tf_transform_output.vocabulary_size_by_name("vocabulary_product_id") + 1
+    )
     product_id_input = tf.keras.Input(
         shape=(1,), name=transformed_name("product_id"), dtype=tf.int64
     )
     embedding = tf.keras.layers.Embedding(
-        input_dim=vocab_size, output_dim=EMBEDDING_DIMENSION, name="embedding_product_id"
+        input_dim=vocab_size,
+        output_dim=EMBEDDING_DIMENSION,
+        name="embedding_product_id",
     )(product_id_input)
-    return tf.keras.Model(inputs=product_id_input, outputs=tf.keras.layers.Flatten()(embedding))
+    return tf.keras.Model(
+        inputs=product_id_input, outputs=tf.keras.layers.Flatten()(embedding)
+    )
 
 
 def run_fn(fn_args: tfx.components.FnArgs):
     """Main training function called by TFX Trainer."""
+    # Verify GPU availability
+    logging.info(f"GPUs available: {tf.config.list_physical_devices('GPU')}")
+    logging.info(f"GPU support: {tf.test.is_gpu_available()}")
+
     tf_transform_output = tft.TFTransformOutput(fn_args.transform_output)
     tft_layer = tf_transform_output.transform_features_layer()
 
@@ -188,8 +219,10 @@ def run_fn(fn_args: tfx.components.FnArgs):
         return {transformed_name("product_id"): transformed_id}
 
     # Map the raw product IDs to their embeddings to create the candidate set for metrics.
-    candidates = products_dict_ds.batch(4096).map(preprocess_product_features).map(
-        lambda x: model.product_model(x[transformed_name("product_id")])
+    candidates = (
+        products_dict_ds.batch(4096)
+        .map(preprocess_product_features)
+        .map(lambda x: model.product_model(x[transformed_name("product_id")]))
     )
 
     model.task.factorized_metrics = tfrs.metrics.FactorizedTopK(candidates=candidates)
@@ -200,7 +233,7 @@ def run_fn(fn_args: tfx.components.FnArgs):
         steps_per_epoch=fn_args.train_steps,
         validation_data=eval_dataset,
         validation_steps=fn_args.eval_steps,
-        callbacks=[tensorboard_callback]
+        callbacks=[tensorboard_callback],
     )
 
     # Create and save retrieval index
@@ -209,7 +242,9 @@ def run_fn(fn_args: tfx.components.FnArgs):
         products_dict_ds.batch(4096).map(
             lambda x: (
                 x["product_id"],  # The raw string ID for retrieval
-                model.product_model(preprocess_product_features(x)[transformed_name("product_id")])
+                model.product_model(
+                    preprocess_product_features(x)[transformed_name("product_id")]
+                ),
             )
         )
     )

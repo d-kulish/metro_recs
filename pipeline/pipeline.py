@@ -61,7 +61,7 @@ def create_pipeline(
     )
 
     # Model training
-    # Use the standard TFX Trainer that runs on Vertex AI
+    # Use the standard TFX Trainer that runs on Vertex AI with GPU resources
     trainer = tfx.components.Trainer(
         module_file=os.path.abspath("pipeline/modules/trainer_module.py"),
         examples=transform.outputs["transformed_examples"],
@@ -77,6 +77,19 @@ def create_pipeline(
             "products_query": config.BQ_PRODUCTS_QUERY,
         },
     )
+
+    # Configure GPU resources for the trainer component
+    trainer.platform_config = {
+        "vertex": {
+            "task_spec": {
+                "machine_spec": {
+                    "machine_type": "n1-standard-4",
+                    "accelerator_type": "NVIDIA_TESLA_T4",
+                    "accelerator_count": 1,
+                },
+            }
+        }
+    }
 
     # Set container image for all components when running on Vertex AI
     components = [
@@ -119,4 +132,3 @@ def create_pipeline(
         pipeline_kwargs["metadata_connection_config"] = metadata_connection_config
 
     return pipeline.Pipeline(**pipeline_kwargs)
-
