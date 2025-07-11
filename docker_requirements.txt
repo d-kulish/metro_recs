@@ -1,6 +1,7 @@
 # Based on TFX 1.14.0 compatibility matrix - stable combination
+# Force rebuild by updating this comment with timestamp: 2025-01-11
 
-# Fix setuptools/distutils conflicts
+# Fix setuptools/distutils conflicts - these should be installed first
 setuptools==67.8.0
 wheel==0.40.0
 
@@ -10,7 +11,7 @@ kfp==1.8.22
 ml-metadata==1.14.0
 tfx-bsl==1.14.0
 
-# TensorFlow stack - stable combination
+# TensorFlow stack - stable combination (some already installed in Dockerfile)
 tensorflow==2.13.1
 tensorflow-transform==1.14.0
 tensorflow-recommenders==0.7.3
@@ -46,7 +47,7 @@ protobuf==3.20.3
 absl-py==1.4.0
 googleapis-common-protos==1.59.1
 
-# JSON Schema validation - compatible versions
+# JSON Schema validation - compatible versions (some already installed)
 jsonschema==4.17.3
 referencing==0.28.4
 attrs==22.2.0
@@ -55,5 +56,11 @@ attrs==22.2.0
 google-cloud-core==2.3.3
 cachetools==5.3.1
 
-# Ensure TFX GCP extensions are included
+# TFX GCP extensions - ensure all extensions are included
 tfx[gcp]==1.14.0
+
+# Additional dependencies that might be missing
+pyarrow>=10.0.0,<11.0.0
+apache-beam[gcp]==2.50.0
+google-cloud-bigquery-storage==2.22.0
+google-resumable-media==2.6.0
