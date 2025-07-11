@@ -122,10 +122,8 @@ DATAFLOW_SUBNETWORK = "regions/europe-west4/subnetworks/default"
 # You must build and push this image to your project's Artifact Registry.
 AR_REPO = "metro-recs-repo"  # The name of your Artifact Registry repository
 IMAGE_NAME = "metro-recs-pipeline"
-# Use updated Docker image tag for stable version
-PIPELINE_IMAGE = (
-    f"{VERTEX_REGION}-docker.pkg.dev/{VERTEX_PROJECT_ID}/{AR_REPO}/{IMAGE_NAME}:stable"
-)
+# Use the actual image tag that matches your build process
+PIPELINE_IMAGE = f"{VERTEX_REGION}-docker.pkg.dev/{VERTEX_PROJECT_ID}/{AR_REPO}/{IMAGE_NAME}:latest-gpu"
 
 # Service account settings - use the Vertex AI service account or the current compute account
 # Option 1: Use the default Vertex AI service account (if it exists)
