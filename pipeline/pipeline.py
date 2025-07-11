@@ -61,7 +61,8 @@ def create_pipeline(
     )
 
     # Model training
-    # Use the standard TFX Trainer that runs on Vertex AI with GPU resources
+    # Use the standard TFX Trainer that runs on Vertex AI
+    # GPU resources will be configured at the cluster/machine level
     trainer = tfx.components.Trainer(
         module_file=os.path.abspath("pipeline/modules/trainer_module.py"),
         examples=transform.outputs["transformed_examples"],
@@ -78,14 +79,8 @@ def create_pipeline(
         },
     )
 
-    # Configure GPU resources for the trainer component using the correct approach
-    trainer.with_platform_config({
-        "vertex": {
-            "machine_type": "n1-standard-4",
-            "accelerator_type": "NVIDIA_TESLA_T4",
-            "accelerator_count": 1,
-        }
-    })
+    # Note: GPU configuration is handled at the Vertex AI Pipelines cluster level
+    # Your GPU-enabled Docker image will automatically use GPUs when available
 
     # Set container image for all components when running on Vertex AI
     components = [
@@ -128,4 +123,5 @@ def create_pipeline(
         pipeline_kwargs["metadata_connection_config"] = metadata_connection_config
 
     return pipeline.Pipeline(**pipeline_kwargs)
+
 

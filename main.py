@@ -86,7 +86,21 @@ def run_pipeline():
                 project=config.VERTEX_PROJECT_ID,
                 location=config.VERTEX_REGION,
                 enable_caching=True,
+                # Configure GPU resources for the entire pipeline
+                parameter_values={},
+                # Set the machine type and accelerator for components that support it
+                job_id=None,
             )
+
+            # Configure GPU resources at submission time
+            job._gca_resource.spec.task_details[0].executor_label = "trainer"
+            job._gca_resource.spec.task_details[
+                0
+            ].task_spec.container_spec.resources.accelerator.type = "NVIDIA_TESLA_T4"
+            job._gca_resource.spec.task_details[
+                0
+            ].task_spec.container_spec.resources.accelerator.count = 1
+
             try:
                 logging.info(f"Submitting pipeline job: {config.PIPELINE_NAME}")
                 # Pass the service account to ensure the pipeline runs with the correct permissions.
