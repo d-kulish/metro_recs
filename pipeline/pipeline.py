@@ -5,6 +5,7 @@ from typing import Optional
 from absl import logging
 from tfx import v1 as tfx
 from tfx.orchestration import pipeline
+from pipeline.components.bq_example_gen import create_bigquery_example_gen
 from ml_metadata.proto import metadata_store_pb2
 
 import config
@@ -27,10 +28,11 @@ def create_pipeline(
     transform_module_path = f"{pipeline_root}/modules/transform_module.py"
     trainer_module_path = f"{pipeline_root}/modules/trainer_module.py"
 
-    # Data ingestion for training examples (user-product interactions)
-    example_gen = tfx.extensions.google_cloud_big_query.BigQueryExampleGen(
-        query=query
-    ).with_id("bq-interactions-gen")
+    # Data ingestion using the custom BigQueryExampleGen for large-scale processing
+    example_gen = create_bigquery_example_gen(
+        query=query,
+        project_id=project_id,
+    ).with_id("custom-bq-interactions-gen")
 
     # Generate statistics
     statistics_gen = tfx.components.StatisticsGen(
@@ -122,4 +124,3 @@ def create_pipeline(
         pipeline_kwargs["metadata_connection_config"] = metadata_connection_config
 
     return pipeline.Pipeline(**pipeline_kwargs)
-

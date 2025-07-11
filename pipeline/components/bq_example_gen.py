@@ -3,6 +3,15 @@
 from typing import Optional, Dict, Any
 import apache_beam as beam
 
+# Import TF Example protos directly to avoid heavy tensorflow import and recursion errors on Dataflow.
+from tensorflow.core.example.example_pb2 import (
+    BytesList,
+    Example,
+    Feature,
+    Features,
+    FloatList,
+)
+
 from tfx.components.example_gen.base_example_gen_executor import BaseExampleGenExecutor
 from tfx.components.example_gen.component import FileBasedExampleGen
 from tfx.components.example_gen import utils
@@ -12,8 +21,8 @@ from tfx.types import standard_artifacts
 
 @beam.ptransform_fn
 @beam.typehints.with_input_types(beam.Pipeline)
-@beam.typehints.with_output_types(beam.Pipeline)  # Changed from tf.train.Example
-def _BigQueryToExample(
+@beam.typehints.with_output_types(Example)
+def _BigQueryToExample(  # pylint: disable=invalid-name
     pipeline: beam.Pipeline, exec_properties: Dict[str, Any], split_pattern: str
 ) -> beam.pvalue.PCollection:
     """Reads from BigQuery in a scalable way and creates tf.Examples."""
@@ -33,25 +42,23 @@ def _BigQueryToExample(
         }
         return formatted_row
 
-    def row_to_example(formatted_row: Dict[str, Any]):
-        """Convert formatted row to TF Example without importing TF at module level."""
-        # Import TensorFlow only when needed to avoid Keras recursion
-        import tensorflow as tf
-
-        # Create TF Example
-        example = tf.train.Example()
+    def row_to_example(formatted_row: Dict[str, Any]) -> Example:
+        """Convert formatted row to TF Example without importing the main TF package."""
+        feature_dict = {}
 
         # Add string features
         for key in ["cust_person_id", "product_id", "city", "date_of_day"]:
             value = formatted_row.get(key, "")
-            example.features.feature[key].bytes_list.value.append(value.encode("utf-8"))
+            feature_dict[key] = Feature(
+                bytes_list=BytesList(value=[value.encode("utf-8")])
+            )
 
         # Add float features
         for key in ["sell_val_nsp", "total_revenue"]:
             value = float(formatted_row.get(key, 0.0))
-            example.features.feature[key].float_list.value.append(value)
+            feature_dict[key] = Feature(float_list=FloatList(value=[value]))
 
-        return example
+        return Example(features=Features(feature=feature_dict))
 
     return (
         pipeline
