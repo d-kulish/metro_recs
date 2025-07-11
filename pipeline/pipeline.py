@@ -41,8 +41,8 @@ def create_pipeline(
             f"--service_account_email={service_account}",
             f"--subnetwork={subnetwork}",
             # Large-scale processing optimizations
-            "--num_workers=10",
-            "--max_num_workers=30",
+            "--num_workers=5",  # Reduced initial workers
+            "--max_num_workers=20",  # Reduced max workers
             "--worker_machine_type=n1-standard-4",
             "--use_execution_time_based_autoscaling=true",
             # Set environment variables for protobuf compatibility

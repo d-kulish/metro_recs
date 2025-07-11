@@ -7,12 +7,10 @@ import apache_beam as beam
 # Set protobuf implementation to avoid version conflicts
 os.environ.setdefault("PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION", "python")
 
-# Use TFX utilities that handle protobuf compatibility
-from tfx.utils import io_utils
-from tfx.types import standard_artifacts
-from tfx.components.example_gen.base_example_gen_executor import BaseExampleGenExecutor
-from tfx.components.example_gen.component import FileBasedExampleGen
+from tfx.components.example_gen import base_example_gen_executor
+from tfx.components.example_gen.component import QueryBasedExampleGen
 from tfx.dsl.components.base import executor_spec
+from tfx.proto import example_gen_pb2
 
 
 @beam.ptransform_fn
@@ -22,8 +20,8 @@ def _BigQueryToExample(  # pylint: disable=invalid-name
     pipeline: beam.Pipeline, exec_properties: Dict[str, Any], split_pattern: str
 ) -> beam.pvalue.PCollection:
     """Reads from BigQuery in a scalable way and creates tf.Examples."""
-    project_id = exec_properties["custom_config"]["project_id"]
     query = exec_properties["custom_config"]["query"]
+    project_id = exec_properties["custom_config"]["project_id"]
 
     def format_row(bq_row: Dict[str, Any]) -> Dict[str, Any]:
         """Formats a BigQuery row into a dictionary with the correct feature names and types."""
@@ -43,51 +41,27 @@ def _BigQueryToExample(  # pylint: disable=invalid-name
         # Ensure protobuf compatibility
         os.environ["PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION"] = "python"
 
-        # Use a direct approach with TensorFlow train module
-        # This avoids complex protobuf imports that cause conflicts
-        try:
-            # Import only what we need from TensorFlow
-            from tensorflow.python.training import example_pb2
+        # Use TensorFlow to create the example
+        import tensorflow as tf
 
-            # Create the example using the lower-level protobuf API
-            example = example_pb2.Example()
+        feature_dict = {}
 
-            # Add string features
-            for key in ["cust_person_id", "product_id", "city", "date_of_day"]:
-                value = formatted_row.get(key, "")
-                example.features.feature[key].bytes_list.value.append(
-                    value.encode("utf-8")
-                )
+        # Add string features
+        for key in ["cust_person_id", "product_id", "city", "date_of_day"]:
+            value = formatted_row.get(key, "")
+            feature_dict[key] = tf.train.Feature(
+                bytes_list=tf.train.BytesList(value=[value.encode("utf-8")])
+            )
 
-            # Add float features
-            for key in ["sell_val_nsp", "total_revenue"]:
-                value = float(formatted_row.get(key, 0.0))
-                example.features.feature[key].float_list.value.append(value)
+        # Add float features
+        for key in ["sell_val_nsp", "total_revenue"]:
+            value = float(formatted_row.get(key, 0.0))
+            feature_dict[key] = tf.train.Feature(
+                float_list=tf.train.FloatList(value=[value])
+            )
 
-            return example.SerializeToString()
-
-        except ImportError:
-            # Fallback to standard TensorFlow if training module is not available
-            import tensorflow as tf
-
-            feature_dict = {}
-
-            # Add string features
-            for key in ["cust_person_id", "product_id", "city", "date_of_day"]:
-                value = formatted_row.get(key, "")
-                feature_dict[key] = tf.train.Feature(
-                    bytes_list=tf.train.BytesList(value=[value.encode("utf-8")])
-                )
-
-            # Add float features
-            for key in ["sell_val_nsp", "total_revenue"]:
-                value = float(formatted_row.get(key, 0.0))
-                feature_dict[key] = tf.train.Feature(
-                    float_list=tf.train.FloatList(value=[value])
-                )
-
-            example = tf.train.Example(features=tf.train.Features(feature=feature_dict))
-            return example.SerializeToString()
+        example = tf.train.Example(features=tf.train.Features(feature=feature_dict))
+        return example.SerializeToString()
 
     return (
         pipeline
@@ -106,7 +80,7 @@ def _BigQueryToExample(  # pylint: disable=invalid-name
     )
 
 
-class BigQueryExampleGenExecutor(BaseExampleGenExecutor):
+class BigQueryExampleGenExecutor(base_example_gen_executor.BaseExampleGenExecutor):
     """Custom executor for BigQuery ExampleGen optimized for large-scale data."""
 
     def GetInputSourceToExamplePTransform(self) -> beam.PTransform:
@@ -117,9 +91,9 @@ class BigQueryExampleGenExecutor(BaseExampleGenExecutor):
 def create_bigquery_example_gen(
     query: str,
     project_id: str,
-    output_config: Optional[Dict[str, Any]] = None,
+    output_config: Optional[example_gen_pb2.Output] = None,
     beam_pipeline_args: Optional[list] = None,
-) -> FileBasedExampleGen:
+) -> QueryBasedExampleGen:
     """Creates a BigQuery ExampleGen component optimized for large datasets."""
 
     # Optimized beam args for large-scale processing
@@ -130,7 +104,7 @@ def create_bigquery_example_gen(
         "--temp_location=gs://recs_metroua/dataflow_temp",
         "--staging_location=gs://recs_metroua/dataflow_staging",
         "--num_workers=10",
-        "--max_num_workers=30",  # Reduced for stability
+        "--max_num_workers=30",
         "--worker_machine_type=n1-standard-4",
         "--disk_size_gb=100",
         "--use_public_ips=false",
@@ -157,16 +131,15 @@ def create_bigquery_example_gen(
         ]
         final_beam_args.extend(beam_pipeline_args)
 
-    # Create a BeamExecutorSpec and add the pipeline arguments to it. This is the
-    # correct way to pass Beam args to a component with a custom executor that
-    # is not a subclass of BaseBeamComponent.
+    # Create a BeamExecutorSpec and add the pipeline arguments to it
     custom_executor = executor_spec.BeamExecutorSpec(
         executor_class=BigQueryExampleGenExecutor
     )
     custom_executor.add_beam_pipeline_args(final_beam_args)
 
-    component = FileBasedExampleGen(
-        input_base="dummy",
+    # Use QueryBasedExampleGen instead of FileBasedExampleGen
+    component = QueryBasedExampleGen(
+        query=query,
         custom_config={
             "query": query,
             "project_id": project_id,
