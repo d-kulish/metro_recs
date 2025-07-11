@@ -148,10 +148,7 @@ def create_bigquery_example_gen(
         custom_executor_spec=executor_spec.ExecutorClassSpec(
             BigQueryExampleGenExecutor
         ),
+        beam_pipeline_args=final_beam_args,
     )
-
-    # Set beam pipeline args for scaling
-    if hasattr(component, "with_beam_pipeline_args"):
-        component.with_beam_pipeline_args(final_beam_args)
 
     return component

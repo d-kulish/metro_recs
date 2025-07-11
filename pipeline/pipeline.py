@@ -99,6 +99,12 @@ def create_pipeline(
 
     # Set the Beam pipeline args for components that support it.
     for component in components:
+        # The custom ExampleGen has its Beam args set during its creation and
+        # does not support `with_beam_pipeline_args` when using a custom executor.
+        # We skip it here to avoid an AttributeError.
+        if component.id == "custom-bq-interactions-gen":
+            continue
+
         if hasattr(component, "with_beam_pipeline_args"):
             component.with_beam_pipeline_args(
                 [
