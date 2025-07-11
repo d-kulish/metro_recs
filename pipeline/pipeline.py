@@ -4,7 +4,8 @@ import os
 from typing import Optional
 from absl import logging
 from tfx import v1 as tfx
-from tfx.proto.orchestration import kubeflow_deployment_config_pb2
+# Use a direct import style which can be more robust in complex environments.
+import tfx.proto.orchestration.kubeflow_deployment_config_pb2 as kubeflow_deployment_config_pb2
 from tfx.orchestration import pipeline
 from ml_metadata.proto import metadata_store_pb2
 
