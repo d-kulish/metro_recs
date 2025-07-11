@@ -89,7 +89,7 @@ class BigQueryExampleGenExecutor(BaseExampleGenExecutor):
 def create_bigquery_example_gen(
     query: str,
     project_id: str,
-    output_config: Optional[standard_artifacts.ExampleGen.OutputConfig] = None,
+    output_config: Optional[Dict[str, Any]] = None,
     beam_pipeline_args: Optional[list] = None,
 ) -> FileBasedExampleGen:
     """Creates a BigQuery ExampleGen component optimized for large datasets.
