@@ -61,6 +61,7 @@ def create_pipeline(
     )
 
     # Model training with GPU support using Vertex AI Training
+    # Use the standard Trainer component with Vertex AI custom job configuration
     trainer = tfx.components.Trainer(
         module_file=os.path.abspath("pipeline/modules/trainer_module.py"),
         examples=transform.outputs["transformed_examples"],
@@ -72,61 +73,34 @@ def create_pipeline(
             "epochs": config.TRAIN_EPOCHS,
             "project_id": project_id,
             "products_query": config.BQ_PRODUCTS_QUERY,
-            # Vertex AI Training configuration using the new format
+            # Vertex AI custom job configuration for GPU training
             "vertex_job_spec": {
-                "worker_pool_specs": [
-                    {
-                        "machine_spec": {
-                            "machine_type": config.GPU_MACHINE_TYPE,
-                            "accelerator_type": config.GPU_ACCELERATOR_TYPE,
-                            "accelerator_count": config.GPU_ACCELERATOR_COUNT,
-                        },
-                        "replica_count": 1,
-                        "container_spec": {
-                            "image_uri": config.PIPELINE_IMAGE,
-                        },
-                    }
-                ]
+                "project": project_id,
+                "location": region,
+                "display_name": f"{pipeline_name}-training",
+                "job_spec": {
+                    "worker_pool_specs": [
+                        {
+                            "machine_spec": {
+                                "machine_type": config.GPU_MACHINE_TYPE,
+                                "accelerator_type": config.GPU_ACCELERATOR_TYPE,
+                                "accelerator_count": config.GPU_ACCELERATOR_COUNT,
+                            },
+                            "replica_count": 1,
+                            "container_spec": {
+                                "image_uri": config.PIPELINE_IMAGE,
+                                "args": [
+                                    f"--distributed-training={config.ENABLE_DISTRIBUTED_TRAINING}",
+                                    f"--batch-size={config.BATCH_SIZE}",
+                                    f"--learning-rate={config.LEARNING_RATE}",
+                                ],
+                            },
+                        }
+                    ],
+                },
             },
         },
     )
-
-    # Configure GPU resources for Vertex AI using platform config
-    from tfx.proto.orchestration import pipeline_pb2
-
-    # Create platform config for GPU training
-    platform_config = pipeline_pb2.PipelineDeploymentConfig()
-    executor_spec = platform_config.executor_specs["Trainer"].add()
-    executor_spec.spec.Pack(
-        pipeline_pb2.ExecutorSpec(
-            python_class_executable_spec=pipeline_pb2.PythonClassExecutableSpec(
-                class_path="tfx.components.trainer.executor.GenericExecutor"
-            ),
-            platform_config_spec=pipeline_pb2.PlatformConfigSpec(
-                kubeflow_platform_config=pipeline_pb2.KubeflowPlatformConfig(
-                    custom_config={
-                        "vertex_job_spec": {
-                            "worker_pool_specs": [
-                                {
-                                    "machine_spec": {
-                                        "machine_type": config.GPU_MACHINE_TYPE,
-                                        "accelerator_type": config.GPU_ACCELERATOR_TYPE,
-                                        "accelerator_count": config.GPU_ACCELERATOR_COUNT,
-                                    },
-                                    "replica_count": 1,
-                                    "container_spec": {
-                                        "image_uri": config.PIPELINE_IMAGE,
-                                    },
-                                }
-                            ]
-                        }
-                    }
-                )
-            ),
-        )
-    )
-
-    trainer.with_platform_config(platform_config)
 
     # Set container image for all components when running on Vertex AI
     components = [

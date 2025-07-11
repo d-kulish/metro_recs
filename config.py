@@ -135,7 +135,7 @@ EVAL_STEPS = 50  # Increased for better evaluation
 BATCH_SIZE = 8192  # Larger batch size for GPU efficiency
 LEARNING_RATE = 0.1
 
-# GPU Training Configuration
+# GPU Training Configuration - Updated for modern Vertex AI
 GPU_MACHINE_TYPE = "n1-standard-4"
 GPU_ACCELERATOR_TYPE = "NVIDIA_TESLA_T4"
 GPU_ACCELERATOR_COUNT = 1
@@ -146,29 +146,29 @@ WORKER_COUNT = 0  # 0 means no workers (single machine training)
 PARAMETER_SERVER_COUNT = 0  # 0 means no parameter servers
 
 # Scaling Configuration for 20-30x data increase
-# Uncomment and adjust these for larger datasets:
+# Updated with modern GPU types and proper machine types
 SCALING_CONFIG = {
     "large_dataset": {
-        "GPU_MACHINE_TYPE": "a2-highgpu-1g",
-        "GPU_ACCELERATOR_TYPE": "NVIDIA_TESLA_A100",
+        "GPU_MACHINE_TYPE": "n1-standard-8",
+        "GPU_ACCELERATOR_TYPE": "NVIDIA_TESLA_T4",
         "GPU_ACCELERATOR_COUNT": 1,
         "BATCH_SIZE": 16384,
         "TRAIN_STEPS": 2000,
         "EVAL_STEPS": 100,
-        "ENABLE_DISTRIBUTED_TRAINING": True,
-        "WORKER_COUNT": 2,  # 2 worker machines
-        "PARAMETER_SERVER_COUNT": 1,  # 1 parameter server
+        "ENABLE_DISTRIBUTED_TRAINING": False,
+        "WORKER_COUNT": 0,
+        "PARAMETER_SERVER_COUNT": 0,
     },
     "extra_large_dataset": {
-        "GPU_MACHINE_TYPE": "a2-highgpu-4g",
-        "GPU_ACCELERATOR_TYPE": "NVIDIA_TESLA_A100",
-        "GPU_ACCELERATOR_COUNT": 4,
+        "GPU_MACHINE_TYPE": "n1-standard-16",
+        "GPU_ACCELERATOR_TYPE": "NVIDIA_TESLA_V100",
+        "GPU_ACCELERATOR_COUNT": 1,
         "BATCH_SIZE": 32768,
         "TRAIN_STEPS": 3000,
         "EVAL_STEPS": 150,
-        "ENABLE_DISTRIBUTED_TRAINING": True,
-        "WORKER_COUNT": 4,  # 4 worker machines
-        "PARAMETER_SERVER_COUNT": 2,  # 2 parameter servers
+        "ENABLE_DISTRIBUTED_TRAINING": False,
+        "WORKER_COUNT": 0,
+        "PARAMETER_SERVER_COUNT": 0,
     },
 }
 

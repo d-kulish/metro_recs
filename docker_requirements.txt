@@ -45,3 +45,6 @@ googleapis-common-protos==1.61.0
 # Additional dependencies for Google Cloud integration
 google-cloud-core==2.3.3
 cachetools==5.3.1
+
+# TFX Google Cloud AI Platform extensions for Vertex AI Training
+tfx[gcp]==1.15.0

@@ -162,11 +162,20 @@ def _build_product_model(
 def run_fn(fn_args: tfx.components.FnArgs):
     """Main training function called by TFX Trainer."""
     # Check if distributed training is enabled
-    distributed_training = fn_args.custom_config.get(
-        "ai_platform_training_args", {}
-    ).get("args", [])
-    is_distributed = any(
-        "--distributed-training=True" in arg for arg in distributed_training
+    vertex_training_args = fn_args.custom_config.get("vertex_training_args", {})
+    worker_pool_specs = vertex_training_args.get("worker_pool_specs", [])
+
+    # Extract distributed training config from worker pool specs
+    is_distributed = (
+        len(worker_pool_specs) > 0 and worker_pool_specs[0].get("replica_count", 1) > 1
+    )
+
+    # Also check legacy config for backward compatibility
+    legacy_args = fn_args.custom_config.get("ai_platform_training_args", {}).get(
+        "args", []
+    )
+    is_distributed = is_distributed or any(
+        "--distributed-training=True" in arg for arg in legacy_args
     )
 
     # Configure distributed training strategy
@@ -209,14 +218,26 @@ def run_fn(fn_args: tfx.components.FnArgs):
     tf_transform_output = tft.TFTransformOutput(fn_args.transform_output)
     tft_layer = tf_transform_output.transform_features_layer()
 
-    # Extract batch size from custom config
+    # Extract batch size and learning rate from container args or legacy config
     batch_size = 4096  # default
-    for arg in fn_args.custom_config.get("ai_platform_training_args", {}).get(
-        "args", []
-    ):
-        if arg.startswith("--batch-size="):
-            batch_size = int(arg.split("=")[1])
-            break
+    learning_rate = 0.1  # default
+
+    # Check Vertex AI training args first
+    if worker_pool_specs:
+        container_args = worker_pool_specs[0].get("container_spec", {}).get("args", [])
+        for arg in container_args:
+            if arg.startswith("--batch-size="):
+                batch_size = int(arg.split("=")[1])
+            elif arg.startswith("--learning-rate="):
+                learning_rate = float(arg.split("=")[1])
+
+    # Fallback to legacy config
+    if batch_size == 4096 or learning_rate == 0.1:
+        for arg in legacy_args:
+            if arg.startswith("--batch-size="):
+                batch_size = int(arg.split("=")[1])
+            elif arg.startswith("--learning-rate="):
+                learning_rate = float(arg.split("=")[1])
 
     # Create datasets with proper batching for distributed training
     train_dataset = _input_fn(
@@ -232,15 +253,6 @@ def run_fn(fn_args: tfx.components.FnArgs):
             user_model=_build_user_model(tf_transform_output),
             product_model=_build_product_model(tf_transform_output),
         )
-
-        # Extract learning rate from custom config
-        learning_rate = 0.1  # default
-        for arg in fn_args.custom_config.get("ai_platform_training_args", {}).get(
-            "args", []
-        ):
-            if arg.startswith("--learning-rate="):
-                learning_rate = float(arg.split("=")[1])
-                break
 
         # Configure optimizer for distributed training
         optimizer = tf.keras.optimizers.Adagrad(learning_rate=learning_rate)
