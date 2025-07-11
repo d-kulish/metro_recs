@@ -6,33 +6,29 @@ kfp==2.7.0
 ml-metadata==1.15.0
 tfx-bsl==1.15.1
 
-# TensorFlow stack - pin to versions compatible with TFX 1.15.0
-tensorflow==2.15.1
+# TensorFlow stack with GPU support
+tensorflow[and-cuda]==2.15.1
 tensorflow-transform==1.15.0
 tensorflow-recommenders==0.7.3
 
-# Apache Beam - use exact version from TFX requirements
+# Apache Beam
 apache-beam[gcp]==2.53.0
 
-# Google Cloud libraries - use versions compatible with TFX 1.15.0
+# Google Cloud libraries
 google-cloud-bigquery==3.11.4
 google-cloud-storage==2.10.0
+google-cloud-aiplatform==1.38.0
 
-# BigQuery pandas integration requirements
-db-dtypes==1.1.1
-pandas>=1.5.0
-
-# Google Auth libraries with OAuth2 client for compatibility
-google-auth==2.23.4
-google-auth-httplib2==0.1.1
-oauth2client==4.1.3
-
-# GPU support - use the available version
+# GPU support
 nvidia-ml-py3==7.352.0
+nvidia-cuda-runtime-cu11==11.8.89
 
-# Core dependencies with exact versions to avoid conflicts
+# Core dependencies
 grpcio==1.60.1
 grpcio-status==1.60.1
 protobuf==4.25.1
 absl-py==1.4.0
 googleapis-common-protos==1.61.0
+
+# Additional for GPU performance
+cupy-cuda11x==12.3.0

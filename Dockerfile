@@ -1,30 +1,32 @@
-# Use an official Python 3.10 image. TFX 1.15.0 requires Python >=3.9 and <3.11.
-FROM python:3.10-slim
+# Use NVIDIA CUDA base image for GPU support
+FROM nvidia/cuda:11.8-cudnn8-runtime-ubuntu20.04
 
-# Copy the requirements file that specifies our additional libraries.
-COPY docker_requirements.txt .
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+ENV CUDA_VISIBLE_DEVICES=0
 
-# Install system dependencies and Python packages in separate steps
+# Install Python 3.10 and system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.10 \
+    python3.10-dev \
+    python3.10-distutils \
+    python3-pip \
     build-essential \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip and install packages with more lenient resolver
+# Create symbolic links for python3.10
+RUN ln -s /usr/bin/python3.10 /usr/bin/python3
+RUN ln -s /usr/bin/python3.10 /usr/bin/python
+
+# Copy the requirements file
+COPY docker_requirements.txt .
+
+# Upgrade pip and install packages
 RUN pip install --no-cache-dir --upgrade pip
 
-# Install packages in order of dependency complexity
-RUN pip install --no-cache-dir \
-    --no-deps \
-    tensorflow==2.15.1
-
-RUN pip install --no-cache-dir \
-    --no-deps \
-    tensorflow-transform==1.15.0
-
-RUN pip install --no-cache-dir \
-    --no-deps \
-    tensorflow-recommenders==0.7.3
+# Install TensorFlow GPU version first
+RUN pip install --no-cache-dir tensorflow[and-cuda]==2.15.1
 
 # Install remaining packages
 RUN pip install --no-cache-dir \

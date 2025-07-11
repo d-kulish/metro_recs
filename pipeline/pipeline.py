@@ -4,9 +4,6 @@ import os
 from typing import Optional
 from absl import logging
 from tfx import v1 as tfx
-
-# Use the correct import path for TFX 1.15.0
-from tfx.proto import trainer_pb2
 from tfx.orchestration import pipeline
 from ml_metadata.proto import metadata_store_pb2
 
@@ -63,36 +60,31 @@ def create_pipeline(
         module_file=os.path.abspath("pipeline/modules/transform_module.py"),
     )
 
-    # Model training
-    # Use the standard TFX Trainer that runs on Vertex AI
-    # GPU resources will be configured at the cluster/machine level
-    trainer = tfx.components.Trainer(
+    # Model training with GPU support on Vertex AI
+    trainer = tfx.extensions.google_cloud_ai_platform.Trainer(
         module_file=os.path.abspath("pipeline/modules/trainer_module.py"),
         examples=transform.outputs["transformed_examples"],
         transform_graph=transform.outputs["transform_graph"],
         schema=transform.outputs["post_transform_schema"],
         train_args=tfx.proto.TrainArgs(num_steps=config.TRAIN_STEPS),
         eval_args=tfx.proto.EvalArgs(num_steps=config.EVAL_STEPS),
-        # The custom_config is used to pass parameters to the trainer module
         custom_config={
-            # Parameters for the trainer module
             "epochs": config.TRAIN_EPOCHS,
             "project_id": project_id,
             "products_query": config.BQ_PRODUCTS_QUERY,
-            # GPU configuration for Vertex AI
-            "vertex_job_spec": {
-                "worker_pool_specs": [
-                    {
-                        "machine_spec": {
-                            "machine_type": "n1-standard-4",
-                            "accelerator_type": "NVIDIA_TESLA_T4",
-                            "accelerator_count": 1,
-                        },
-                        "replica_count": 1,
-                        "container_spec": {"image_uri": config.PIPELINE_IMAGE},
+            # Vertex AI Training job configuration
+            "ai_platform_training_args": {
+                "project": project_id,
+                "region": region,
+                "masterConfig": {
+                    "imageUri": config.PIPELINE_IMAGE,
+                    "machineType": "n1-standard-4",
+                    "acceleratorConfig": {
+                        "type": "NVIDIA_TESLA_T4",
+                        "count": 1
                     }
-                ]
-            },
+                }
+            }
         },
     )
 

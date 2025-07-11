@@ -161,9 +161,28 @@ def _build_product_model(
 
 def run_fn(fn_args: tfx.components.FnArgs):
     """Main training function called by TFX Trainer."""
+    # Configure GPU usage
+    gpus = tf.config.experimental.list_physical_devices("GPU")
+    if gpus:
+        try:
+            # Enable memory growth to prevent TensorFlow from allocating all GPU memory
+            for gpu in gpus:
+                tf.config.experimental.set_memory_growth(gpu, True)
+
+            # Enable mixed precision for better GPU performance
+            tf.keras.mixed_precision.set_global_policy("mixed_float16")
+
+            logging.info(f"GPUs available: {len(gpus)}")
+            logging.info(f"GPU devices: {[gpu.name for gpu in gpus]}")
+            logging.info("Mixed precision enabled for better GPU performance")
+        except RuntimeError as e:
+            logging.error(f"GPU configuration error: {e}")
+    else:
+        logging.warning("No GPUs detected. Training will run on CPU.")
+
     # Verify GPU availability
-    logging.info(f"GPUs available: {tf.config.list_physical_devices('GPU')}")
     logging.info(f"GPU support: {tf.test.is_gpu_available()}")
+    logging.info(f"Built with CUDA: {tf.test.is_built_with_cuda()}")
 
     tf_transform_output = tft.TFTransformOutput(fn_args.transform_output)
     tft_layer = tf_transform_output.transform_features_layer()
@@ -182,8 +201,16 @@ def run_fn(fn_args: tfx.components.FnArgs):
         product_model=_build_product_model(tf_transform_output),
     )
 
-    # Compile and train
-    model.compile(optimizer=tf.keras.optimizers.Adagrad(learning_rate=0.1))
+    # Use mixed precision optimizer if GPUs are available
+    if gpus:
+        optimizer = tf.keras.optimizers.Adagrad(learning_rate=0.1)
+        optimizer = tf.keras.mixed_precision.LossScaleOptimizer(optimizer)
+        logging.info("Using mixed precision optimizer for GPU training")
+    else:
+        optimizer = tf.keras.optimizers.Adagrad(learning_rate=0.1)
+
+    # Compile with the configured optimizer
+    model.compile(optimizer=optimizer)
     tensorboard_callback = tf.keras.callbacks.TensorBoard(
         log_dir=fn_args.model_run_dir, update_freq="batch"
     )

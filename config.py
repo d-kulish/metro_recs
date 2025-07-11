@@ -127,8 +127,22 @@ PIPELINE_IMAGE = f"{VERTEX_REGION}-docker.pkg.dev/{VERTEX_PROJECT_ID}/{AR_REPO}/
 # Option 2: Use the current compute service account (needs proper roles)
 VERTEX_SERVICE_ACCOUNT = "1032729337493-compute@developer.gserviceaccount.com"
 
-# Model settings
+# Model settings - Updated for GPU training and scaling
 EMBEDDING_DIMENSION = 32
 TRAIN_EPOCHS = 5
-TRAIN_STEPS = 500
-EVAL_STEPS = 10
+TRAIN_STEPS = 1000  # Increased for better GPU utilization
+EVAL_STEPS = 50  # Increased for better evaluation
+BATCH_SIZE = 8192  # Larger batch size for GPU efficiency
+
+# GPU Training Configuration
+GPU_MACHINE_TYPE = "n1-standard-4"
+GPU_ACCELERATOR_TYPE = "NVIDIA_TESLA_T4"
+GPU_ACCELERATOR_COUNT = 1
+
+# For scaling up (when data increases 20-30x)
+# Uncomment these for larger datasets:
+# GPU_MACHINE_TYPE = "a2-highgpu-1g"
+# GPU_ACCELERATOR_TYPE = "NVIDIA_TESLA_A100"
+# GPU_ACCELERATOR_COUNT = 1
+# BATCH_SIZE = 16384
+# TRAIN_STEPS = 2000
