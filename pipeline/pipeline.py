@@ -61,8 +61,8 @@ def create_pipeline(
     )
 
     # Model training
-    # Use Vertex AI Trainer instead of the legacy AI Platform Trainer
-    trainer = tfx.extensions.google_cloud_ai_platform.Trainer(
+    # Use the standard TFX Trainer that runs on Vertex AI
+    trainer = tfx.components.Trainer(
         module_file=os.path.abspath("pipeline/modules/trainer_module.py"),
         examples=transform.outputs["transformed_examples"],
         transform_graph=transform.outputs["transform_graph"],
@@ -70,26 +70,11 @@ def create_pipeline(
         train_args=tfx.proto.TrainArgs(num_steps=config.TRAIN_STEPS),
         eval_args=tfx.proto.EvalArgs(num_steps=config.EVAL_STEPS),
         # The custom_config is used to pass parameters to the trainer module
-        # and to configure the AI Platform Training job.
         custom_config={
             # Parameters for the trainer module
             "epochs": config.TRAIN_EPOCHS,
             "project_id": project_id,
             "products_query": config.BQ_PRODUCTS_QUERY,
-            # Configuration for AI Platform Training job (correct key and format)
-            "ai_platform_training_args": {
-                "project": project_id,
-                "region": region,
-                "scaleTier": "CUSTOM",
-                "masterType": "n1-standard-4",
-                "masterConfig": {
-                    "imageUri": config.PIPELINE_IMAGE,
-                    "acceleratorConfig": {
-                        "type": "NVIDIA_TESLA_T4",
-                        "count": 1,
-                    },
-                },
-            },
         },
     )
 
@@ -134,3 +119,4 @@ def create_pipeline(
         pipeline_kwargs["metadata_connection_config"] = metadata_connection_config
 
     return pipeline.Pipeline(**pipeline_kwargs)
+
