@@ -27,8 +27,6 @@ def run_pipeline():
         runner_config = kubeflow_v2_dag_runner.KubeflowV2DagRunnerConfig(
             display_name=config.PIPELINE_NAME,
             default_image=config.PIPELINE_IMAGE,
-            # Force use of Vertex AI Training instead of AI Platform Training
-            use_vertex_ai_training=True,
         )
 
         # Create a temporary directory for the pipeline JSON
@@ -135,5 +133,7 @@ def main(_):
     run_pipeline()
 
 
+if __name__ == "__main__":
+    app.run(main)
 if __name__ == "__main__":
     app.run(main)
