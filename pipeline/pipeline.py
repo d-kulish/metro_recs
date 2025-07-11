@@ -61,7 +61,7 @@ def create_pipeline(
     )
 
     # Model training with GPU support on Vertex AI
-    trainer = tfx.extensions.google_cloud_ai_platform.Trainer(
+    trainer = tfx.components.Trainer(
         module_file=os.path.abspath("pipeline/modules/trainer_module.py"),
         examples=transform.outputs["transformed_examples"],
         transform_graph=transform.outputs["transform_graph"],
@@ -72,19 +72,20 @@ def create_pipeline(
             "epochs": config.TRAIN_EPOCHS,
             "project_id": project_id,
             "products_query": config.BQ_PRODUCTS_QUERY,
-            # Vertex AI Training job configuration
-            "ai_platform_training_args": {
-                "project": project_id,
-                "region": region,
-                "masterConfig": {
-                    "imageUri": config.PIPELINE_IMAGE,
-                    "machineType": "n1-standard-4",
-                    "acceleratorConfig": {
-                        "type": "NVIDIA_TESLA_T4",
-                        "count": 1
+            # GPU configuration for Vertex AI using vertex_job_spec
+            "vertex_job_spec": {
+                "worker_pool_specs": [
+                    {
+                        "machine_spec": {
+                            "machine_type": config.GPU_MACHINE_TYPE,
+                            "accelerator_type": config.GPU_ACCELERATOR_TYPE,
+                            "accelerator_count": config.GPU_ACCELERATOR_COUNT,
+                        },
+                        "replica_count": 1,
+                        "container_spec": {"image_uri": config.PIPELINE_IMAGE},
                     }
-                }
-            }
+                ]
+            },
         },
     )
 
