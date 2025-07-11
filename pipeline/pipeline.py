@@ -72,36 +72,47 @@ def create_pipeline(
             "epochs": config.TRAIN_EPOCHS,
             "project_id": project_id,
             "products_query": config.BQ_PRODUCTS_QUERY,
-            # Vertex AI Training job configuration with GPU and scaling support
+            # Vertex AI Training job configuration with correct field names
             "ai_platform_training_args": {
                 "project": project_id,
                 "region": region,
+                "jobDir": f"{pipeline_root}/training_jobs",
                 "masterConfig": {
                     "imageUri": config.PIPELINE_IMAGE,
-                    "machineType": config.GPU_MACHINE_TYPE,
+                    "machine_type": config.GPU_MACHINE_TYPE,
                     "acceleratorConfig": {
                         "type": config.GPU_ACCELERATOR_TYPE,
                         "count": config.GPU_ACCELERATOR_COUNT,
                     },
                 },
-                # Add worker configuration for distributed training when scaling up
-                "workerConfig": {
-                    "imageUri": config.PIPELINE_IMAGE,
-                    "machineType": config.GPU_MACHINE_TYPE,
-                    "acceleratorConfig": {
-                        "type": config.GPU_ACCELERATOR_TYPE,
-                        "count": config.GPU_ACCELERATOR_COUNT,
-                    },
-                },
-                "workerCount": config.WORKER_COUNT,
-                # Enable parameter server for distributed training
-                "parameterServerConfig": {
-                    "imageUri": config.PIPELINE_IMAGE,
-                    "machineType": "n1-standard-4",
-                },
-                "parameterServerCount": config.PARAMETER_SERVER_COUNT,
-                # Job-level configuration
-                "jobDir": f"{pipeline_root}/training_jobs",
+                # Only add worker config if we have workers
+                **(
+                    {
+                        "workerConfig": {
+                            "imageUri": config.PIPELINE_IMAGE,
+                            "machine_type": config.GPU_MACHINE_TYPE,
+                            "acceleratorConfig": {
+                                "type": config.GPU_ACCELERATOR_TYPE,
+                                "count": config.GPU_ACCELERATOR_COUNT,
+                            },
+                        },
+                        "workerCount": config.WORKER_COUNT,
+                    }
+                    if config.WORKER_COUNT > 0
+                    else {}
+                ),
+                # Only add parameter server config if we have parameter servers
+                **(
+                    {
+                        "parameterServerConfig": {
+                            "imageUri": config.PIPELINE_IMAGE,
+                            "machine_type": "n1-standard-4",
+                        },
+                        "parameterServerCount": config.PARAMETER_SERVER_COUNT,
+                    }
+                    if config.PARAMETER_SERVER_COUNT > 0
+                    else {}
+                ),
                 "args": [
                     f"--distributed-training={config.ENABLE_DISTRIBUTED_TRAINING}",
                     f"--batch-size={config.BATCH_SIZE}",
