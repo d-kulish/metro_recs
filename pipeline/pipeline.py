@@ -53,7 +53,7 @@ def create_pipeline(
                 "--max_num_workers=20",
                 "--worker_machine_type=n1-standard-4",
                 "--use_execution_time_based_autoscaling=true",
-                "--use_public_ips=false",
+                "--no_use_public_ips",  # Fixed: use correct flag
                 # Set environment variables for protobuf compatibility
                 "--environment_type=DOCKER",
                 "--environment_config=PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python",
@@ -131,7 +131,7 @@ def create_pipeline(
         f"--staging_location={pipeline_root}/dataflow_staging",
         f"--service_account_email={service_account}",
         f"--subnetwork={subnetwork}",
-        "--no_use_public_ips",
+        "--no_use_public_ips",  # Fixed: use correct flag
         # Optimizations for large data processing
         "--num_workers=5",
         "--max_num_workers=20",

@@ -111,7 +111,7 @@ def create_bigquery_example_gen(
         "--max_num_workers=30",
         "--worker_machine_type=n1-standard-4",
         "--disk_size_gb=100",
-        "--use_public_ips=false",
+        "--no_use_public_ips",  # Fixed: use correct flag
         # Performance optimizations for large data
         "--experiments=use_runner_v2",
         "--experiments=use_unified_worker",
