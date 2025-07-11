@@ -70,31 +70,25 @@ def create_pipeline(
         train_args=tfx.proto.TrainArgs(num_steps=config.TRAIN_STEPS),
         eval_args=tfx.proto.EvalArgs(num_steps=config.EVAL_STEPS),
         # The custom_config is used to pass parameters to the trainer module
-        # and to configure the Vertex AI Training job.
+        # and to configure the AI Platform Training job.
         custom_config={
             # Parameters for the trainer module
             "epochs": config.TRAIN_EPOCHS,
             "project_id": project_id,
             "products_query": config.BQ_PRODUCTS_QUERY,
-            # Configuration for Vertex AI Training job (correct format)
-            "vertex_training_args": {
+            # Configuration for AI Platform Training job (correct key and format)
+            "ai_platform_training_args": {
                 "project": project_id,
-                "location": region,
-                "display_name": f"{config.PIPELINE_NAME}-training",
-                "worker_pool_specs": [
-                    {
-                        "machine_spec": {
-                            "machine_type": "n1-standard-4",
-                            "accelerator_type": "NVIDIA_TESLA_T4",
-                            "accelerator_count": 1,
-                        },
-                        "replica_count": 1,
-                        "container_spec": {
-                            "image_uri": config.PIPELINE_IMAGE,
-                        },
-                    }
-                ],
-                "service_account": service_account,
+                "region": region,
+                "scaleTier": "CUSTOM",
+                "masterType": "n1-standard-4",
+                "masterConfig": {
+                    "imageUri": config.PIPELINE_IMAGE,
+                    "acceleratorConfig": {
+                        "type": "NVIDIA_TESLA_T4",
+                        "count": 1,
+                    },
+                },
             },
         },
     )
