@@ -215,27 +215,6 @@ def run_fn(fn_args: tfx.components.FnArgs):
     tf_transform_output = tft.TFTransformOutput(fn_args.transform_output)
     tft_layer = tf_transform_output.transform_features_layer()
 
-    # Extract batch size and learning rate from container args or legacy config
-    batch_size = 4096  # default
-    learning_rate = 0.1  # default
-
-    # Check Vertex AI training args first (vertex_job_spec structure)
-    if worker_pool_specs:
-        container_args = worker_pool_specs[0].get("container_spec", {}).get("args", [])
-        for arg in container_args:
-            if arg.startswith("--batch-size="):
-                batch_size = int(arg.split("=")[1])
-            elif arg.startswith("--learning-rate="):
-                learning_rate = float(arg.split("=")[1])
-
-    # Fallback to legacy config
-    if batch_size == 4096 or learning_rate == 0.1:
-        for arg in legacy_args:
-            if arg.startswith("--batch-size="):
-                batch_size = int(arg.split("=")[1])
-            elif arg.startswith("--learning-rate="):
-                learning_rate = float(arg.split("=")[1])
-
     # Create datasets with proper batching for distributed training
     train_dataset = _input_fn(
         fn_args.train_files, fn_args.data_accessor, tf_transform_output, batch_size
@@ -380,5 +359,6 @@ def run_fn(fn_args: tfx.components.FnArgs):
         tft_layer=tft_layer,
         raw_feature_spec=tf_transform_output.raw_feature_spec(),
     )
+
 
     tf.saved_model.save(serving_model, fn_args.serving_model_dir)
