@@ -61,8 +61,8 @@ def create_pipeline(
     )
 
     # Model training with GPU support using Vertex AI Training
-    # Use extension that actually supports Vertex AI Custom Jobs
-    trainer = tfx.extensions.google_cloud_ai_platform.Trainer(
+    # Use standard Trainer with proper Vertex AI configuration
+    trainer = tfx.components.Trainer(
         module_file=os.path.abspath("pipeline/modules/trainer_module.py"),
         examples=transform.outputs["transformed_examples"],
         transform_graph=transform.outputs["transform_graph"],
@@ -73,30 +73,8 @@ def create_pipeline(
             "epochs": config.TRAIN_EPOCHS,
             "project_id": project_id,
             "products_query": config.BQ_PRODUCTS_QUERY,
-            # Use both configurations for compatibility
-            "ai_platform_training_args": {
-                "project": project_id,
-                "region": region,
-                "jobDir": f"{pipeline_root}/training_jobs",
-                "args": [
-                    f"--distributed-training={config.ENABLE_DISTRIBUTED_TRAINING}",
-                    f"--batch-size={config.BATCH_SIZE}",
-                    f"--learning-rate={config.LEARNING_RATE}",
-                ],
-                "masterConfig": {
-                    "imageUri": config.PIPELINE_IMAGE,
-                    "machineType": config.GPU_MACHINE_TYPE,
-                    "acceleratorConfig": {
-                        "type": config.GPU_ACCELERATOR_TYPE,
-                        "count": config.GPU_ACCELERATOR_COUNT,
-                    },
-                },
-            },
-            # Also include vertex_training_args for newer TFX versions
-            "vertex_training_args": {
-                "project": project_id,
-                "location": region,
-                "display_name": f"{pipeline_name}-training",
+            # Use ONLY Vertex AI Training configuration
+            "vertex_job_spec": {
                 "worker_pool_specs": [
                     {
                         "machine_spec": {
@@ -115,6 +93,10 @@ def create_pipeline(
                         },
                     }
                 ],
+                "scheduling": {
+                    "disable_retries": True,
+                },
+                "service_account": service_account,
             },
         },
     )
@@ -147,6 +129,17 @@ def create_pipeline(
                     "--no_use_public_ips",
                 ]
             )
+
+    pipeline_kwargs = {
+        "pipeline_name": pipeline_name,
+        "pipeline_root": pipeline_root,
+        "components": components,
+        "enable_cache": enable_cache,
+    }
+
+    # Only add metadata_connection_config if it's not None
+    if metadata_connection_config is not None:
+        pipeline_kwargs["metadata_connection_config"] = metadata_connection_config
 
     pipeline_kwargs = {
         "pipeline_name": pipeline_name,

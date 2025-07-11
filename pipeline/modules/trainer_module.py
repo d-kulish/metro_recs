@@ -162,9 +162,9 @@ def _build_product_model(
 def run_fn(fn_args: tfx.components.FnArgs):
     """Main training function called by TFX Trainer."""
     # Check if distributed training is enabled
-    # Handle both vertex_job_spec and legacy configurations
+    # Handle vertex_job_spec configuration
     vertex_job_spec = fn_args.custom_config.get("vertex_job_spec", {})
-    worker_pool_specs = vertex_job_spec.get("job_spec", {}).get("worker_pool_specs", [])
+    worker_pool_specs = vertex_job_spec.get("worker_pool_specs", [])
 
     # Extract distributed training config from worker pool specs
     is_distributed = (
@@ -223,7 +223,7 @@ def run_fn(fn_args: tfx.components.FnArgs):
     batch_size = 4096  # default
     learning_rate = 0.1  # default
 
-    # Check Vertex AI training args first (new structure)
+    # Check Vertex AI training args first (vertex_job_spec structure)
     if worker_pool_specs:
         container_args = worker_pool_specs[0].get("container_spec", {}).get("args", [])
         for arg in container_args:
