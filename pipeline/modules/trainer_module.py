@@ -161,59 +161,112 @@ def _build_product_model(
 
 def run_fn(fn_args: tfx.components.FnArgs):
     """Main training function called by TFX Trainer."""
-    # Configure GPU usage
-    gpus = tf.config.experimental.list_physical_devices("GPU")
-    if gpus:
-        try:
-            # Enable memory growth to prevent TensorFlow from allocating all GPU memory
-            for gpu in gpus:
-                tf.config.experimental.set_memory_growth(gpu, True)
+    # Check if distributed training is enabled
+    distributed_training = fn_args.custom_config.get(
+        "ai_platform_training_args", {}
+    ).get("args", [])
+    is_distributed = any(
+        "--distributed-training=True" in arg for arg in distributed_training
+    )
 
-            # Enable mixed precision for better GPU performance
-            tf.keras.mixed_precision.set_global_policy("mixed_float16")
-
-            logging.info(f"GPUs available: {len(gpus)}")
-            logging.info(f"GPU devices: {[gpu.name for gpu in gpus]}")
-            logging.info("Mixed precision enabled for better GPU performance")
-        except RuntimeError as e:
-            logging.error(f"GPU configuration error: {e}")
+    # Configure distributed training strategy
+    strategy = None
+    if is_distributed:
+        # Use MultiWorkerMirroredStrategy for distributed training
+        strategy = tf.distribute.MultiWorkerMirroredStrategy()
+        logging.info("Using MultiWorkerMirroredStrategy for distributed training")
     else:
-        logging.warning("No GPUs detected. Training will run on CPU.")
+        # Configure GPU usage for single machine
+        gpus = tf.config.experimental.list_physical_devices("GPU")
+        if gpus:
+            try:
+                # Enable memory growth to prevent TensorFlow from allocating all GPU memory
+                for gpu in gpus:
+                    tf.config.experimental.set_memory_growth(gpu, True)
+
+                # Use MirroredStrategy for multi-GPU on single machine
+                if len(gpus) > 1:
+                    strategy = tf.distribute.MirroredStrategy()
+                    logging.info(f"Using MirroredStrategy with {len(gpus)} GPUs")
+                else:
+                    logging.info("Using single GPU")
+
+                # Enable mixed precision for better GPU performance
+                tf.keras.mixed_precision.set_global_policy("mixed_float16")
+                logging.info("Mixed precision enabled for better GPU performance")
+            except RuntimeError as e:
+                logging.error(f"GPU configuration error: {e}")
+        else:
+            logging.warning("No GPUs detected. Training will run on CPU.")
 
     # Verify GPU availability
+    logging.info(
+        f"GPUs available: {tf.config.experimental.list_physical_devices('GPU')}"
+    )
     logging.info(f"GPU support: {tf.test.is_gpu_available()}")
     logging.info(f"Built with CUDA: {tf.test.is_built_with_cuda()}")
 
     tf_transform_output = tft.TFTransformOutput(fn_args.transform_output)
     tft_layer = tf_transform_output.transform_features_layer()
 
-    # Create datasets
+    # Extract batch size from custom config
+    batch_size = 4096  # default
+    for arg in fn_args.custom_config.get("ai_platform_training_args", {}).get(
+        "args", []
+    ):
+        if arg.startswith("--batch-size="):
+            batch_size = int(arg.split("=")[1])
+            break
+
+    # Create datasets with proper batching for distributed training
     train_dataset = _input_fn(
-        fn_args.train_files, fn_args.data_accessor, tf_transform_output, 4096
+        fn_args.train_files, fn_args.data_accessor, tf_transform_output, batch_size
     )
     eval_dataset = _input_fn(
-        fn_args.eval_files, fn_args.data_accessor, tf_transform_output, 4096
+        fn_args.eval_files, fn_args.data_accessor, tf_transform_output, batch_size
     )
 
-    # Build model
-    model = MetroRecommendationModel(
-        user_model=_build_user_model(tf_transform_output),
-        product_model=_build_product_model(tf_transform_output),
-    )
+    # Build model within strategy scope for distributed training
+    with strategy.scope() if strategy else tf.name_scope("model"):
+        model = MetroRecommendationModel(
+            user_model=_build_user_model(tf_transform_output),
+            product_model=_build_product_model(tf_transform_output),
+        )
 
-    # Use mixed precision optimizer if GPUs are available
-    if gpus:
-        optimizer = tf.keras.optimizers.Adagrad(learning_rate=0.1)
-        optimizer = tf.keras.mixed_precision.LossScaleOptimizer(optimizer)
-        logging.info("Using mixed precision optimizer for GPU training")
-    else:
-        optimizer = tf.keras.optimizers.Adagrad(learning_rate=0.1)
+        # Extract learning rate from custom config
+        learning_rate = 0.1  # default
+        for arg in fn_args.custom_config.get("ai_platform_training_args", {}).get(
+            "args", []
+        ):
+            if arg.startswith("--learning-rate="):
+                learning_rate = float(arg.split("=")[1])
+                break
 
-    # Compile with the configured optimizer
-    model.compile(optimizer=optimizer)
-    tensorboard_callback = tf.keras.callbacks.TensorBoard(
-        log_dir=fn_args.model_run_dir, update_freq="batch"
-    )
+        # Configure optimizer for distributed training
+        optimizer = tf.keras.optimizers.Adagrad(learning_rate=learning_rate)
+
+        # Use mixed precision optimizer if GPUs are available
+        if tf.config.experimental.list_physical_devices("GPU"):
+            optimizer = tf.keras.mixed_precision.LossScaleOptimizer(optimizer)
+            logging.info("Using mixed precision optimizer for GPU training")
+
+        # Compile with the configured optimizer
+        model.compile(optimizer=optimizer)
+
+    # Configure callbacks for distributed training
+    callbacks = [
+        tf.keras.callbacks.TensorBoard(
+            log_dir=fn_args.model_run_dir, update_freq="batch"
+        )
+    ]
+
+    # Add early stopping for long training runs
+    if fn_args.train_steps > 1000:
+        callbacks.append(
+            tf.keras.callbacks.EarlyStopping(
+                monitor="val_loss", patience=3, restore_best_weights=True
+            )
+        )
 
     # --- Candidate set creation for evaluation ---
     logging.info("Querying BigQuery for candidate products...")
@@ -223,17 +276,12 @@ def run_fn(fn_args: tfx.components.FnArgs):
     products_df = client.query(products_query).to_dataframe()
     logging.info(f"Found {len(products_df)} candidate products.")
 
-    # Create a tf.data.Dataset of raw product IDs.
+    # Create candidate dataset for metrics
     products_ds = tf.data.Dataset.from_tensor_slices(
         products_df["product_id"].astype(str)
     )
-
-    # Create a dataset of dictionaries for preprocessing.
     products_dict_ds = products_ds.map(lambda x: {"product_id": x})
 
-    # Create a dedicated preprocessing layer for product IDs. This is crucial
-    # because the main `tft_layer` expects all features, but here we only have
-    # the product_id. We use the vocabulary computed by the Transform component.
     product_vocab = tf_transform_output.vocabulary_by_name("vocabulary_product_id")
     product_lookup_layer = tf.keras.layers.StringLookup(
         vocabulary=product_vocab, num_oov_indices=1
@@ -241,18 +289,24 @@ def run_fn(fn_args: tfx.components.FnArgs):
 
     def preprocess_product_features(features):
         """Applies the product_id transformation."""
-        # The input `features` is a dictionary like {"product_id": "some_id_string"}
         transformed_id = product_lookup_layer(features["product_id"])
         return {transformed_name("product_id"): transformed_id}
 
-    # Map the raw product IDs to their embeddings to create the candidate set for metrics.
+    # Create candidates for metrics
     candidates = (
-        products_dict_ds.batch(4096)
+        products_dict_ds.batch(batch_size)
         .map(preprocess_product_features)
         .map(lambda x: model.product_model(x[transformed_name("product_id")]))
     )
 
     model.task.factorized_metrics = tfrs.metrics.FactorizedTopK(candidates=candidates)
+
+    # Train the model
+    logging.info(f"Starting training with batch size: {batch_size}")
+    if strategy:
+        logging.info(
+            f"Distributed training enabled with strategy: {type(strategy).__name__}"
+        )
 
     model.fit(
         train_dataset,
@@ -260,15 +314,15 @@ def run_fn(fn_args: tfx.components.FnArgs):
         steps_per_epoch=fn_args.train_steps,
         validation_data=eval_dataset,
         validation_steps=fn_args.eval_steps,
-        callbacks=[tensorboard_callback],
+        callbacks=callbacks,
     )
 
     # Create and save retrieval index
     index = tfrs.layers.factorized_top_k.BruteForce(model.user_model)
     index.index_from_dataset(
-        products_dict_ds.batch(4096).map(
+        products_dict_ds.batch(batch_size).map(
             lambda x: (
-                x["product_id"],  # The raw string ID for retrieval
+                x["product_id"],
                 model.product_model(
                     preprocess_product_features(x)[transformed_name("product_id")]
                 ),
@@ -276,10 +330,7 @@ def run_fn(fn_args: tfx.components.FnArgs):
         )
     )
 
-    # Create a dedicated serving model that inherits from tf.Module. This ensures
-    # that all components needed for serving (the index, the TFT layer, etc.)
-    # are properly "tracked" by TensorFlow and can be saved correctly, resolving
-    # the "untracked" resource error.
+    # Save the serving model
     class ServingModel(tf.Module):
         def __init__(self, index, tft_layer, raw_feature_spec):
             self.index = index

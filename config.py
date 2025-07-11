@@ -133,16 +133,51 @@ TRAIN_EPOCHS = 5
 TRAIN_STEPS = 1000  # Increased for better GPU utilization
 EVAL_STEPS = 50  # Increased for better evaluation
 BATCH_SIZE = 8192  # Larger batch size for GPU efficiency
+LEARNING_RATE = 0.1
 
 # GPU Training Configuration
 GPU_MACHINE_TYPE = "n1-standard-4"
 GPU_ACCELERATOR_TYPE = "NVIDIA_TESLA_T4"
 GPU_ACCELERATOR_COUNT = 1
 
-# For scaling up (when data increases 20-30x)
-# Uncomment these for larger datasets:
-# GPU_MACHINE_TYPE = "a2-highgpu-1g"
-# GPU_ACCELERATOR_TYPE = "NVIDIA_TESLA_A100"
-# GPU_ACCELERATOR_COUNT = 1
-# BATCH_SIZE = 16384
-# TRAIN_STEPS = 2000
+# Distributed Training Configuration
+ENABLE_DISTRIBUTED_TRAINING = False
+WORKER_COUNT = 0  # 0 means no workers (single machine training)
+PARAMETER_SERVER_COUNT = 0  # 0 means no parameter servers
+
+# Scaling Configuration for 20-30x data increase
+# Uncomment and adjust these for larger datasets:
+SCALING_CONFIG = {
+    "large_dataset": {
+        "GPU_MACHINE_TYPE": "a2-highgpu-1g",
+        "GPU_ACCELERATOR_TYPE": "NVIDIA_TESLA_A100",
+        "GPU_ACCELERATOR_COUNT": 1,
+        "BATCH_SIZE": 16384,
+        "TRAIN_STEPS": 2000,
+        "EVAL_STEPS": 100,
+        "ENABLE_DISTRIBUTED_TRAINING": True,
+        "WORKER_COUNT": 2,  # 2 worker machines
+        "PARAMETER_SERVER_COUNT": 1,  # 1 parameter server
+    },
+    "extra_large_dataset": {
+        "GPU_MACHINE_TYPE": "a2-highgpu-4g",
+        "GPU_ACCELERATOR_TYPE": "NVIDIA_TESLA_A100",
+        "GPU_ACCELERATOR_COUNT": 4,
+        "BATCH_SIZE": 32768,
+        "TRAIN_STEPS": 3000,
+        "EVAL_STEPS": 150,
+        "ENABLE_DISTRIBUTED_TRAINING": True,
+        "WORKER_COUNT": 4,  # 4 worker machines
+        "PARAMETER_SERVER_COUNT": 2,  # 2 parameter servers
+    },
+}
+
+
+# Function to apply scaling configuration
+def apply_scaling_config(config_name):
+    """Apply scaling configuration for larger datasets."""
+    if config_name in SCALING_CONFIG:
+        globals().update(SCALING_CONFIG[config_name])
+        print(f"Applied scaling configuration: {config_name}")
+    else:
+        print(f"Configuration {config_name} not found")
