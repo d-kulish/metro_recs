@@ -61,8 +61,8 @@ def create_pipeline(
     )
 
     # Model training with GPU support using Vertex AI Training
-    # Use native Vertex AI Training configuration instead of legacy AI Platform format
-    trainer = tfx.components.Trainer(
+    # Use extension that actually supports Vertex AI Custom Jobs
+    trainer = tfx.extensions.google_cloud_ai_platform.Trainer(
         module_file=os.path.abspath("pipeline/modules/trainer_module.py"),
         examples=transform.outputs["transformed_examples"],
         transform_graph=transform.outputs["transform_graph"],
@@ -73,8 +73,11 @@ def create_pipeline(
             "epochs": config.TRAIN_EPOCHS,
             "project_id": project_id,
             "products_query": config.BQ_PRODUCTS_QUERY,
-            # Native Vertex AI Training configuration
-            "vertex_job_spec": {
+            # Use the correct Vertex AI Training configuration format
+            "vertex_training_args": {
+                "project": project_id,
+                "location": region,
+                "display_name": f"{pipeline_name}-training",
                 "worker_pool_specs": [
                     {
                         "machine_spec": {
@@ -92,18 +95,6 @@ def create_pipeline(
                             ],
                         },
                     }
-                ],
-                "scheduling": {
-                    "disable_retries": True,
-                },
-                "service_account": service_account,
-            },
-            # Keep legacy config for backward compatibility in trainer_module.py
-            "ai_platform_training_args": {
-                "args": [
-                    f"--distributed-training={config.ENABLE_DISTRIBUTED_TRAINING}",
-                    f"--batch-size={config.BATCH_SIZE}",
-                    f"--learning-rate={config.LEARNING_RATE}",
                 ],
             },
         },
