@@ -1,47 +1,47 @@
-# Based on TFX 1.17.0 for better GPU support
+# Based on TFX 1.16.0 compatibility matrix - corrected versions
 
-# Core TFX stack with latest stable versions
-tfx==1.17.0
-kfp==2.9.0
-ml-metadata==1.17.0
-tfx-bsl==1.17.0
+# Core TFX stack with correct latest stable versions
+tfx==1.16.0
+kfp==2.8.0
+ml-metadata==1.16.0
+tfx-bsl==1.16.0
 
-# TensorFlow stack - latest compatible versions
-tensorflow-transform==1.17.0
+# TensorFlow stack - compatible with TFX 1.16.0
+tensorflow-transform==1.16.0
 tensorflow-recommenders==0.7.3
 
-# Apache Beam - use latest compatible version
-apache-beam[gcp]==2.56.0
+# Apache Beam - use version compatible with TFX 1.16.0
+apache-beam[gcp]==2.53.0
 
-# Google Cloud libraries - latest versions
-google-cloud-bigquery==3.14.0
-google-cloud-storage==2.12.0
-google-cloud-aiplatform==1.40.0
+# Google Cloud libraries - use compatible versions
+google-cloud-bigquery==3.11.4
+google-cloud-storage==2.10.0
+google-cloud-aiplatform==1.36.0
 
 # BigQuery pandas integration
-db-dtypes==1.2.0
+db-dtypes==1.1.1
 pandas>=1.5.0,<2.1.0
 
-# Google Auth libraries - latest compatible versions
-google-auth==2.24.0
+# Google Auth libraries - compatible versions
+google-auth==2.23.4
 google-auth-httplib2==0.1.1
-google-auth-oauthlib==1.1.0
-google-api-python-client==2.112.0
-google-api-core==2.14.0
+google-auth-oauthlib==1.0.0
+google-api-python-client==2.108.0
+google-api-core==2.11.1
 
 # GPU monitoring (optional)
 nvidia-ml-py3==7.352.0
 
-# Core dependencies - latest versions
-grpcio==1.62.0
-grpcio-status==1.62.0
-protobuf==4.25.3
-absl-py==2.0.0
-googleapis-common-protos==1.62.0
+# Core dependencies - compatible with TFX 1.16.0
+grpcio==1.60.1
+grpcio-status==1.60.1
+protobuf==4.25.1
+absl-py==1.4.0
+googleapis-common-protos==1.61.0
 
 # Additional dependencies for Google Cloud integration
-google-cloud-core==2.4.1
-cachetools==5.3.2
+google-cloud-core==2.3.3
+cachetools==5.3.1
 
 # Ensure TFX GCP extensions are included
-tfx[gcp]==1.17.0
+tfx[gcp]==1.16.0
