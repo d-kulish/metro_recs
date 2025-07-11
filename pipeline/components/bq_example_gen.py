@@ -4,11 +4,11 @@ from typing import Optional, Dict, Any
 import apache_beam as beam
 
 # Import TF Example protos directly to avoid heavy tensorflow import and recursion errors on Dataflow.
-from tensorflow.core.example.example_pb2 import (
+# Correctly import protobuf classes from their respective modules.
+from tensorflow.core.example.example_pb2 import Example, Features
+from tensorflow.core.example.feature_pb2 import (
     BytesList,
-    Example,
     Feature,
-    Features,
     FloatList,
 )
 
