@@ -118,8 +118,6 @@ def create_bigquery_example_gen(
         "--experiments=use_runner_v2",
         "--experiments=use_unified_worker",
         "--experiments=shuffle_mode=service",
-        # Memory optimizations
-        "--worker_harness_container_image=gcr.io/dataflow-templates-base/python310-template:latest",
     ]
 
     # Merge with provided beam args
