@@ -73,7 +73,26 @@ def create_pipeline(
             "epochs": config.TRAIN_EPOCHS,
             "project_id": project_id,
             "products_query": config.BQ_PRODUCTS_QUERY,
-            # Use the correct Vertex AI Training configuration format
+            # Use both configurations for compatibility
+            "ai_platform_training_args": {
+                "project": project_id,
+                "region": region,
+                "jobDir": f"{pipeline_root}/training_jobs",
+                "args": [
+                    f"--distributed-training={config.ENABLE_DISTRIBUTED_TRAINING}",
+                    f"--batch-size={config.BATCH_SIZE}",
+                    f"--learning-rate={config.LEARNING_RATE}",
+                ],
+                "masterConfig": {
+                    "imageUri": config.PIPELINE_IMAGE,
+                    "machineType": config.GPU_MACHINE_TYPE,
+                    "acceleratorConfig": {
+                        "type": config.GPU_ACCELERATOR_TYPE,
+                        "count": config.GPU_ACCELERATOR_COUNT,
+                    },
+                },
+            },
+            # Also include vertex_training_args for newer TFX versions
             "vertex_training_args": {
                 "project": project_id,
                 "location": region,
