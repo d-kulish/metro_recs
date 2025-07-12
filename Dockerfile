@@ -88,11 +88,6 @@ RUN touch /app/__init__.py && \
 # Set PYTHONPATH to include the app directory
 ENV PYTHONPATH=/app
 
-# Ensure the container can handle Dataflow worker startup
-# Add essential environment variables for Dataflow compatibility
-ENV GOOGLE_APPLICATION_CREDENTIALS=""
-ENV DATAFLOW_PYTHON_SDK_LOCATION=""
-
 # Clean up
 RUN apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/* && \
     rm -f /tmp/docker_requirements.txt

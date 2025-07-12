@@ -142,14 +142,3 @@ def create_bigquery_example_gen(
 
 # Make the executor class available at module level for TFX import
 __all__ = ["BigQueryExampleGenExecutor", "create_bigquery_example_gen"]
-        output_config=output_config,
-    )
-
-    # Apply beam pipeline args using the with_beam_pipeline_args method
-    component = component.with_beam_pipeline_args(final_beam_args)
-
-    return component
-
-
-# Make the executor class available at module level for TFX import
-__all__ = ["BigQueryExampleGenExecutor", "create_bigquery_example_gen"]
