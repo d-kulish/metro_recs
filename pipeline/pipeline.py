@@ -33,7 +33,7 @@ def create_pipeline(
     transform_module_path = f"{pipeline_root}/modules/transform_module.py"
     trainer_module_path = f"{pipeline_root}/modules/trainer_module.py"
 
-    # Data ingestion - use standard BigQueryExampleGen
+    # Data ingestion - simplified Dataflow configuration
     example_gen = (
         BigQueryExampleGen(
             query=query,
@@ -48,15 +48,17 @@ def create_pipeline(
                 "--runner=DataflowRunner",
                 f"--temp_location={pipeline_root}/dataflow_temp",
                 f"--staging_location={pipeline_root}/dataflow_staging",
-                # Large-scale processing optimizations
-                "--num_workers=5",
-                "--max_num_workers=20",
-                "--worker_machine_type=n1-standard-4",
-                "--use_execution_time_based_autoscaling=true",
-                "--no_use_public_ips",  # Fixed: use correct flag
-                # Set environment variables for protobuf compatibility
-                "--environment_type=DOCKER",
-                "--environment_config=PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python",
+                # Simplified worker configuration
+                "--num_workers=2",
+                "--max_num_workers=10",
+                "--worker_machine_type=n1-standard-2",
+                "--disk_size_gb=50",
+                "--no_use_public_ips",
+                # Remove problematic environment configurations
+                "--experiments=use_runner_v2",
+                "--save_main_session",
+                # Add job name for better tracking
+                f"--job_name=tfx-bq-example-gen-{pipeline_name.replace('_', '-')}",
             ]
         )
         .with_id("hybrid-bq-example-gen")
@@ -122,7 +124,7 @@ def create_pipeline(
         trainer,
     ]
 
-    # Optimize Dataflow settings for data processing components
+    # Simplified Dataflow settings for data processing components
     dataflow_beam_args = [
         f"--project={project_id}",
         f"--region={region}",
@@ -131,15 +133,14 @@ def create_pipeline(
         f"--staging_location={pipeline_root}/dataflow_staging",
         f"--service_account_email={service_account}",
         f"--subnetwork={subnetwork}",
-        "--no_use_public_ips",  # Fixed: use correct flag
-        # Optimizations for large data processing
-        "--num_workers=5",
-        "--max_num_workers=20",
+        "--no_use_public_ips",
+        # Simplified optimizations
+        "--num_workers=2",
+        "--max_num_workers=10",
         "--worker_machine_type=n1-standard-2",
-        "--use_execution_time_based_autoscaling=true",
-        # Add protobuf environment variable for all Dataflow workers
-        "--environment_type=DOCKER",
-        "--environment_config=PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python",
+        "--disk_size_gb=50",
+        "--experiments=use_runner_v2",
+        "--save_main_session",
     ]
 
     # Set the Beam pipeline args for components that support it

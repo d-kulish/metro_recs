@@ -74,13 +74,11 @@ def _BigQueryToExample(  # pylint: disable=invalid-name
             query=query,
             use_standard_sql=True,
             project=project_id,
-            # Add options for large-scale processing
-            use_json_exports=False,  # Use Avro for better performance with large data
-            temp_dataset=f"{project_id}.temp_bq_export",  # Temporary dataset for exports
+            # Simplified BigQuery read configuration
+            use_json_exports=True,  # Use JSON exports for better compatibility
         )
         | "FormatRow" >> beam.Map(format_row)
         | "ToTFExample" >> beam.Map(row_to_example)
-        | "Reshuffle" >> beam.Reshuffle()  # Add reshuffle for better parallelization
     )
 
 
@@ -100,30 +98,21 @@ def create_bigquery_example_gen(
 ) -> BigQueryExampleGen:
     """Creates a BigQuery ExampleGen component optimized for large datasets."""
 
-    # Optimized beam args for large-scale processing
+    # Simplified beam args for better compatibility
     default_beam_args = [
         "--runner=DataflowRunner",
         f"--project={project_id}",
         "--region=europe-west4",
         "--temp_location=gs://recs_metroua/dataflow_temp",
         "--staging_location=gs://recs_metroua/dataflow_staging",
-        "--num_workers=10",
-        "--max_num_workers=30",
-        "--worker_machine_type=n1-standard-4",
-        "--disk_size_gb=100",
-        "--no_use_public_ips",  # Fixed: use correct flag
-        # Performance optimizations for large data
+        "--num_workers=2",
+        "--max_num_workers=10",
+        "--worker_machine_type=n1-standard-2",
+        "--disk_size_gb=50",
+        "--no_use_public_ips",
+        # Essential experiments only
         "--experiments=use_runner_v2",
-        "--experiments=use_unified_worker",
-        "--experiments=shuffle_mode=service",
-        "--experiments=use_monitoring_state_manager",
-        "--experiments=enable_prime_watermark_optimization",
-        # Memory optimization
-        "--worker_memory_mb=15000",
-        "--use_execution_time_based_autoscaling=true",
-        # Set environment variables for protobuf compatibility
-        "--environment_type=DOCKER",
-        "--environment_config=PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python",
+        "--save_main_session",
     ]
 
     # Merge with provided beam args
@@ -142,6 +131,17 @@ def create_bigquery_example_gen(
     # This avoids the import path issues with custom executors
     component = BigQueryExampleGen(
         query=query,
+        output_config=output_config,
+    )
+
+    # Apply beam pipeline args using the with_beam_pipeline_args method
+    component = component.with_beam_pipeline_args(final_beam_args)
+
+    return component
+
+
+# Make the executor class available at module level for TFX import
+__all__ = ["BigQueryExampleGenExecutor", "create_bigquery_example_gen"]
         output_config=output_config,
     )
 

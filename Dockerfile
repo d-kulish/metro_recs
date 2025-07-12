@@ -88,6 +88,11 @@ RUN touch /app/__init__.py && \
 # Set PYTHONPATH to include the app directory
 ENV PYTHONPATH=/app
 
+# Ensure the container can handle Dataflow worker startup
+# Add essential environment variables for Dataflow compatibility
+ENV GOOGLE_APPLICATION_CREDENTIALS=""
+ENV DATAFLOW_PYTHON_SDK_LOCATION=""
+
 # Clean up
 RUN apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/* && \
     rm -f /tmp/docker_requirements.txt
@@ -95,3 +100,6 @@ RUN apt-get autoremove -y && apt-get clean && rm -rf /var/lib/apt/lists/* && \
 # Add a final verification step
 RUN python3.10 -c "import sys; print('Python path:', sys.path)" && \
     python3.10 -c "import pipeline; print('Pipeline module imported successfully')" || echo "Pipeline module not found - this is expected on first build"
+
+# Set proper entrypoint for Dataflow workers
+ENTRYPOINT ["python3.10"]
